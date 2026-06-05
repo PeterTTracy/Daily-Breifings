@@ -2,19 +2,29 @@ import './globals.css';
 import Providers from './providers';
 import Nav from './components/Nav';
 import ThemeToggle from './components/ThemeToggle';
+import InstallPrompt from './components/InstallPrompt';
 
 export const metadata = {
   title: 'MIT Dining Operations',
   description: 'Campus dining operations — daily briefing, house views, and portfolio roll-up',
+  applicationName: 'MIT Dining Ops',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/icon-192.png',
+    apple: '/apple-touch-icon.png',
+  },
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'Dining Ops' },
 };
 
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  themeColor: '#1B3A5C',
+  viewportFit: 'cover',
+  // Status-bar/chrome color tracks the active scheme so it blends with the shell.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f6f5f2' },
+    { media: '(prefers-color-scheme: dark)', color: '#0e0e10' },
+  ],
 };
 
 // Runs before paint to apply the saved (or system) theme and avoid a flash of
@@ -25,7 +35,6 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="apple-touch-icon" href="/icon-192.png" />
         <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
       </head>
       <body className="min-h-screen bg-pagebg text-ink">
@@ -41,6 +50,7 @@ export default function RootLayout({ children }) {
           </header>
           <main className="mx-auto w-full max-w-content px-4 pb-28 pt-5">{children}</main>
           <Nav />
+          <InstallPrompt />
         </Providers>
       </body>
     </html>
