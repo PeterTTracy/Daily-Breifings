@@ -47,7 +47,7 @@ export default async function PortfolioPage() {
                   title={`${c.name}: ${c.score.toFixed(2)}`}
                 >
                   <StatusDot color={c.color} size="sm" />
-                  <span className="text-[9px] leading-none text-muted">{c.short}</span>
+                  <span className="text-[10px] leading-none text-muted">{c.short}</span>
                 </div>
               ))}
             </div>

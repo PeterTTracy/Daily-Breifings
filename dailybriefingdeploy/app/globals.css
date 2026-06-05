@@ -2,35 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Light theme tokens (default). These mirror the original inline-style palette
-   so the look is preserved after the Tailwind conversion. */
+/* MIT-flavored palette. Accent is MIT cardinal red (#A31F34); secondary tones
+   are MIT silver/gray. Semantic tokens are referenced through Tailwind colors
+   (bg-surface, text-ink, ...) and switch automatically with the .dark class. */
+
+/* Light theme */
 :root {
-  --pagebg: #f5f5f0;
+  --pagebg: #f6f5f2;
   --surface: #ffffff;
-  --line: #e0ddd5;
-  --ink: #2c2c2a;
-  --muted: #888780;
-  --heading: #1b3a5c;
-  --accent: #2e75b6;
-  --completed: #f0f0ec;
-  --subtle: #f8f8f5;
-  --subtletext: #5f5e5a;
-  --highlight: #e24b4a;
+  --line: #e4e2dc;
+  --ink: #232220;
+  --muted: #6e6d67;
+  --heading: #232220;
+  --accent: #a31f34; /* MIT cardinal red */
+  --completed: #efeee9;
+  --subtle: #f1f0ec;
+  --subtletext: #5b5a54;
+  --highlight: #a31f34;
 }
 
-/* Dark theme tokens — applied when <html> has the `.dark` class. */
+/* MIT dark mode — near-black with cardinal red + silver. */
 .dark {
-  --pagebg: #141619;
-  --surface: #1d2025;
-  --line: #2d323a;
-  --ink: #e6e6e2;
-  --muted: #9a9a93;
-  --heading: #8fb8e6;
-  --accent: #5b9bd5;
-  --completed: #23272d;
-  --subtle: #191c20;
-  --subtletext: #b5b5ae;
-  --highlight: #e2706f;
+  --pagebg: #0e0e10;
+  --surface: #18181b;
+  --line: #2a2a2f;
+  --ink: #f2f1ef;
+  --muted: #a6a6a8; /* MIT silver, brightened for contrast on near-black */
+  --heading: #f2f1ef;
+  --accent: #e1485c; /* brightened MIT red for legibility on dark */
+  --completed: #1f1f23;
+  --subtle: #141417;
+  --subtletext: #b8b8ba;
+  --highlight: #e1485c;
 }
 
 html,
@@ -43,5 +46,20 @@ body {
   background: var(--pagebg);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tighter tracking on large headings reads cleaner. */
+h1 {
+  letter-spacing: -0.01em;
+}
+
+/* Respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+  }
 }

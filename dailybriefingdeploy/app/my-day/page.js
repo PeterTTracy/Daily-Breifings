@@ -22,7 +22,7 @@ function Badge({ type, children }) {
 function ActionItem({ item, onToggle }) {
   return (
     <div
-      className={`mb-1.5 flex items-start gap-2.5 rounded-[10px] border border-line p-3 transition-all ${
+      className={`mb-1.5 flex items-start gap-2.5 rounded-xl border border-line p-3 transition-all ${
         item.completed ? 'bg-completed opacity-50' : 'bg-surface'
       }`}
     >
@@ -49,7 +49,7 @@ function ActionItem({ item, onToggle }) {
 function NextUpCard({ event }) {
   return (
     <div
-      className="flex items-center gap-3 rounded-[10px] border border-line bg-surface p-4"
+      className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4"
       style={event.highlight ? { borderLeft: '3px solid var(--highlight)' } : undefined}
     >
       <div className="min-w-[100px] whitespace-nowrap text-[13px] font-medium text-accent">{event.time}</div>
@@ -76,7 +76,7 @@ function Section({ icon, title, badge, children }) {
 
 function StatCard({ num, label }) {
   return (
-    <div className="rounded-[10px] border border-line bg-surface px-4 py-3.5 text-center">
+    <div className="rounded-xl border border-line bg-surface px-4 py-3.5 text-center">
       <div className="text-2xl font-medium text-ink">{num}</div>
       <div className="mt-0.5 text-xs text-muted">{label}</div>
     </div>
@@ -88,7 +88,6 @@ export default function MyDay() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastRefresh, setLastRefresh] = useState(null);
-  const [pullRequested, setPullRequested] = useState(false);
 
   const fetchBriefing = useCallback(async () => {
     try {
@@ -186,7 +185,7 @@ export default function MyDay() {
       )}
 
       {data.tomorrowPreview && (
-        <div className="mb-6 rounded-[10px] border border-line bg-subtle p-3.5">
+        <div className="mb-6 rounded-xl border border-line bg-subtle p-3.5">
           <p className="m-0 text-[13px] font-medium text-muted">Coming up</p>
           <p className="mt-1 text-xs text-subtletext">{data.tomorrowPreview}</p>
         </div>
@@ -195,7 +194,7 @@ export default function MyDay() {
       {fyi.length > 0 && (
         <Section icon="ℹ️" title="FYI">
           {fyi.map((i) => (
-            <div key={i.id} className="mb-1 rounded-[10px] border border-line bg-surface p-3.5 opacity-80">
+            <div key={i.id} className="mb-1 rounded-xl border border-line bg-surface p-3.5 opacity-80">
               <p className="m-0 text-[13px] text-ink">{i.description}</p>
               <p className="mt-1 text-[11px] text-muted">
                 <Badge type="fyi">{i.priorityLabel}</Badge> {i.sender && <span> · {i.sender}</span>}{' '}
@@ -213,33 +212,15 @@ export default function MyDay() {
       )}
 
       <div className="border-t border-line py-5 text-center">
-        <div className="flex items-center justify-center gap-2.5">
-          <button
-            onClick={fetchBriefing}
-            className="rounded-lg border border-accent bg-surface px-6 py-2.5 text-[13px] text-accent"
-          >
-            Refresh
-          </button>
-          <button
-            onClick={async () => {
-              setPullRequested(true);
-              try {
-                await fetch('/api/refresh', { method: 'POST' });
-              } catch (e) {}
-            }}
-            disabled={pullRequested}
-            className="rounded-lg border border-accent bg-surface px-6 py-2.5 text-[13px] text-accent disabled:opacity-50"
-          >
-            {pullRequested ? 'Pull requested ✓' : 'Request new pull'}
-          </button>
-        </div>
-        {pullRequested && (
-          <p className="mt-2 text-[11px] text-muted">
-            Claude will scan email/calendar and update this page within ~15 minutes.
-          </p>
-        )}
+        <button
+          onClick={fetchBriefing}
+          className="rounded-lg border border-accent bg-surface px-6 py-2.5 text-[13px] text-accent"
+        >
+          Refresh
+        </button>
         {lastRefresh && <p className="mt-2 text-[11px] text-muted">Last updated {lastRefresh.toLocaleTimeString()}</p>}
       </div>
     </div>
   );
 }
+

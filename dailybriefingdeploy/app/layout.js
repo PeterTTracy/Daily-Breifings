@@ -30,10 +30,16 @@ export default function RootLayout({ children }) {
       </head>
       <body className="min-h-screen bg-pagebg text-ink">
         <Providers>
-          <div className="mx-auto flex w-full max-w-content justify-end px-4 pt-3">
-            <ThemeToggle />
-          </div>
-          <main className="mx-auto w-full max-w-content px-4 pb-24 pt-2">{children}</main>
+          <header className="sticky top-0 z-40 border-b border-line bg-pagebg/85 backdrop-blur">
+            <div className="mx-auto flex w-full max-w-content items-center justify-between px-4 py-2.5">
+              <div className="flex items-center gap-2">
+                <span className="h-3.5 w-3.5 rounded-[3px] bg-accent" aria-hidden="true" />
+                <span className="text-[13px] font-semibold tracking-tight text-ink">MIT Dining Ops</span>
+              </div>
+              <ThemeToggle />
+            </div>
+          </header>
+          <main className="mx-auto w-full max-w-content px-4 pb-28 pt-5">{children}</main>
           <Nav />
         </Providers>
       </body>

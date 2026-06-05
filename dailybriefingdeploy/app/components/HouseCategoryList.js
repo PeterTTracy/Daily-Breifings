@@ -13,7 +13,7 @@ export default function HouseCategoryList({ categories }) {
       {categories.map((c) => {
         const isOpen = !!open[c.key];
         return (
-          <div key={c.key} className="overflow-hidden rounded-[10px] border border-line bg-surface">
+          <div key={c.key} className="overflow-hidden rounded-xl border border-line bg-surface">
             <button
               onClick={() => toggle(c.key)}
               aria-expanded={isOpen}

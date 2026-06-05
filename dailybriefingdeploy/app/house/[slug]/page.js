@@ -47,7 +47,7 @@ export default async function HousePage({ params }) {
         </div>
       </div>
 
-      <div className="mb-5 rounded-[10px] border border-line bg-subtle px-3.5 py-2.5 text-[13px]">
+      <div className="mb-5 rounded-xl border border-line bg-subtle px-3.5 py-2.5 text-[13px]">
         <span className="text-muted">EC:</span> <span className="text-ink">{h.ec_name || 'TBD'}</span>
         <span className="text-muted"> · </span>
         <span className="text-ink">{h.contact || 'TBD'}</span>
