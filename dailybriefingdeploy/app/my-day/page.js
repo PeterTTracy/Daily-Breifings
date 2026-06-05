@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import ThemeToggle from '../components/ThemeToggle';
 
 // Badge palettes keep the exact original colors, with explicit dark: variants
 // since these are accent chips (not the CSS-variable-backed semantic surfaces).
@@ -154,12 +153,9 @@ export default function MyDay() {
     <div>
       <div className="mb-5 flex items-center justify-between">
         <h1 className="m-0 text-[22px] font-medium text-heading">Daily briefing</h1>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <div className="text-[13px] text-muted">{data.date}</div>
-            <div className="text-[11px] text-muted">{data.briefingType} briefing</div>
-          </div>
-          <ThemeToggle />
+        <div className="text-right">
+          <div className="text-[13px] text-muted">{data.date}</div>
+          <div className="text-[11px] text-muted">{data.briefingType} briefing</div>
         </div>
       </div>
 

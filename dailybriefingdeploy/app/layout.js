@@ -1,6 +1,7 @@
 import './globals.css';
 import Providers from './providers';
 import Nav from './components/Nav';
+import ThemeToggle from './components/ThemeToggle';
 
 export const metadata = {
   title: 'MIT Dining Operations',
@@ -29,7 +30,10 @@ export default function RootLayout({ children }) {
       </head>
       <body className="min-h-screen bg-pagebg text-ink">
         <Providers>
-          <main className="mx-auto w-full max-w-content px-4 pb-24 pt-4">{children}</main>
+          <div className="mx-auto flex w-full max-w-content justify-end px-4 pt-3">
+            <ThemeToggle />
+          </div>
+          <main className="mx-auto w-full max-w-content px-4 pb-24 pt-2">{children}</main>
           <Nav />
         </Providers>
       </body>

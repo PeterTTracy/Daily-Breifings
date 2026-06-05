@@ -1,10 +1,6 @@
 // Seed data for the MIT Dining Operations Platform.
-// Houses, categories, KPIs, and scoring thresholds from the platform spec.
-//
-// ⚠️ KPI NAMES BELOW ARE PLACEHOLDERS. The category weights, house list, and
-// thresholds are taken verbatim from the spec; the 20 KPI definitions are a
-// reasonable scaffold distributed across the categories and MUST be replaced
-// with the exact KPI list from the spec. Search for "TODO(spec)" to find them.
+// Houses, categories, and the 20 scorecard KPIs from Pete's spec.
+// Scoring thresholds and color logic live in lib/scoring.ts.
 
 export type HouseType = 'residential' | 'cluster';
 
@@ -12,16 +8,20 @@ export interface House {
   slug: string;
   name: string;
   type: HouseType;
+  parentSlug?: string | null;
+  ec_name?: string; // Executive Chef — placeholder until real assignments land
+  contact?: string;
+  active?: boolean;
 }
 
 export const HOUSES: House[] = [
-  { slug: 'maseeh', name: 'Maseeh', type: 'residential' },
-  { slug: 'baker', name: 'Baker', type: 'residential' },
-  { slug: 'mccormick', name: 'McCormick', type: 'residential' },
-  { slug: 'next', name: 'Next', type: 'residential' },
-  { slug: 'simmons', name: 'Simmons', type: 'residential' },
-  { slug: 'new-vassar', name: 'New Vassar', type: 'residential' },
-  { slug: 'retail', name: 'Retail', type: 'cluster' },
+  { slug: 'maseeh', name: 'Maseeh', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
+  { slug: 'baker', name: 'Baker', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
+  { slug: 'mccormick', name: 'McCormick', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
+  { slug: 'next', name: 'Next', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
+  { slug: 'simmons', name: 'Simmons', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
+  { slug: 'new-vassar', name: 'New Vassar', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
+  { slug: 'retail', name: 'Retail', type: 'cluster', ec_name: 'TBD', contact: 'TBD', active: true },
 ];
 
 export const HOUSE_SLUGS = HOUSES.map((h) => h.slug);
@@ -29,85 +29,69 @@ export const HOUSE_SLUGS = HOUSES.map((h) => h.slug);
 export interface Category {
   key: string;
   name: string;
-  /** Weight as a percentage of the overall score. Spec weights sum to ~100. */
+  short: string;
+  /** Weight as a percentage of the overall portfolio score. Spec weights sum to ~100. */
   weight: number;
 }
 
 export const CATEGORIES: Category[] = [
-  { key: 'nutrition_programming', name: 'Nutrition / Programming', weight: 23.8 },
-  { key: 'financial_performance', name: 'Financial Performance', weight: 25.0 },
-  { key: 'quality_assurance', name: 'Quality Assurance', weight: 20.0 },
-  { key: 'employee_relations', name: 'Employee Relations', weight: 14.5 },
-  { key: 'customer_satisfaction', name: 'Customer Satisfaction', weight: 12.0 },
-  { key: 'sustainability', name: 'Sustainability', weight: 4.8 },
+  { key: 'nutrition_programming', name: 'Nutrition / Programming', short: 'Nutr', weight: 23.8 },
+  { key: 'financial_performance', name: 'Financial Performance', short: 'Fin', weight: 25.0 },
+  { key: 'quality_assurance', name: 'Quality Assurance', short: 'QA', weight: 20.0 },
+  { key: 'employee_relations', name: 'Employee Relations', short: 'Emp', weight: 14.5 },
+  { key: 'customer_satisfaction', name: 'Customer Satisfaction', short: 'Cust', weight: 12.0 },
+  { key: 'sustainability', name: 'Sustainability', short: 'Sust', weight: 4.8 },
 ];
 
 export type CategoryKey = (typeof CATEGORIES)[number]['key'];
 
-export type KpiDirection = 'higher_better' | 'lower_better';
-
 export interface Kpi {
   id: string;
-  name: string;
   category: CategoryKey;
-  unit?: string;
-  direction: KpiDirection;
+  name: string;
+  /** Equal weight within each category for now (percent, sums to ~100 per category). */
+  weightWithinCategory: number;
+  signal_source: string;
+  /** Per spec, store the signal-source string as the measurement mechanic for now. */
+  measurement_mechanic: string;
 }
 
-// TODO(spec): replace the 20 placeholder KPIs below with the exact definitions
-// from the spec. Distribution: Financial 4, Nutrition/Programming 4, Quality 4,
-// Employee Relations 3, Customer Satisfaction 3, Sustainability 2 = 20.
+// 20 KPIs from the spec. Equal weight within each category.
 export const KPIS: Kpi[] = [
-  // Financial Performance (4)
-  { id: 'fin_food_cost', name: 'Food cost % of revenue', category: 'financial_performance', unit: '%', direction: 'lower_better' },
-  { id: 'fin_labor_cost', name: 'Labor cost % of revenue', category: 'financial_performance', unit: '%', direction: 'lower_better' },
-  { id: 'fin_budget_variance', name: 'Budget variance', category: 'financial_performance', unit: '%', direction: 'lower_better' },
-  { id: 'fin_waste', name: 'Food waste %', category: 'financial_performance', unit: '%', direction: 'lower_better' },
+  // Nutrition / Programming (2 KPIs → 50% each)
+  { id: 'menu_compliance', category: 'nutrition_programming', name: 'Menu Compliance / BITE Standards', weightWithinCategory: 50, signal_source: 'Café Manager Menu Page', measurement_mechanic: 'Café Manager Menu Page' },
+  { id: 'special_diet_allergen', category: 'nutrition_programming', name: 'Special Diet & Allergen Execution', weightWithinCategory: 50, signal_source: 'Café Manager Menu Page', measurement_mechanic: 'Café Manager Menu Page' },
 
-  // Nutrition / Programming (4)
-  { id: 'nut_menu_cycle', name: 'Menu cycle compliance', category: 'nutrition_programming', unit: '%', direction: 'higher_better' },
-  { id: 'nut_labeling', name: 'Nutritional labeling accuracy', category: 'nutrition_programming', unit: '%', direction: 'higher_better' },
-  { id: 'nut_special_diet', name: 'Special-diet request fulfillment', category: 'nutrition_programming', unit: '%', direction: 'higher_better' },
-  { id: 'nut_programming', name: 'Programming events held', category: 'nutrition_programming', unit: 'count', direction: 'higher_better' },
+  // Financial Performance (5 KPIs → 20% each)
+  { id: 'food_cost_vs_budget', category: 'financial_performance', name: 'Food Cost vs Budget', weightWithinCategory: 20, signal_source: 'FoodCost Visualization', measurement_mechanic: 'FoodCost Visualization' },
+  { id: 'labor_cost_vs_budget', category: 'financial_performance', name: 'Labor Cost vs Budget', weightWithinCategory: 20, signal_source: 'FY26 Labor Hours vs Budgeted', measurement_mechanic: 'FY26 Labor Hours vs Budgeted' },
+  { id: 'cost_per_meal', category: 'financial_performance', name: 'Cost per Meal', weightWithinCategory: 20, signal_source: 'FoodCost Visualization', measurement_mechanic: 'FoodCost Visualization' },
+  { id: 'overtime_control', category: 'financial_performance', name: 'Overtime Control', weightWithinCategory: 20, signal_source: 'Attendance & OT Early-Warning Dashboard', measurement_mechanic: 'Attendance & OT Early-Warning Dashboard' },
+  { id: 'inventory_accuracy', category: 'financial_performance', name: 'Inventory Accuracy', weightWithinCategory: 20, signal_source: 'MyFi Cost of Goods vs physical counts', measurement_mechanic: 'MyFi Cost of Goods vs physical counts' },
 
-  // Quality Assurance (4)
-  { id: 'qa_health_inspection', name: 'Health inspection score', category: 'quality_assurance', unit: 'score', direction: 'higher_better' },
-  { id: 'qa_food_safety_audit', name: 'Internal food-safety audit', category: 'quality_assurance', unit: '%', direction: 'higher_better' },
-  { id: 'qa_temp_logs', name: 'Temperature log compliance', category: 'quality_assurance', unit: '%', direction: 'higher_better' },
-  { id: 'qa_recipe_adherence', name: 'Recipe adherence', category: 'quality_assurance', unit: '%', direction: 'higher_better' },
+  // Quality Assurance (5 KPIs → 20% each)
+  { id: 'sanitation_cleanliness', category: 'quality_assurance', name: 'Sanitation & Cleanliness', weightWithinCategory: 20, signal_source: 'Safety Tracker / training reset → Ladle (future)', measurement_mechanic: 'Safety Tracker / training reset → Ladle (future)' },
+  { id: 'hygiene_compliance', category: 'quality_assurance', name: 'Hygiene Compliance', weightWithinCategory: 20, signal_source: 'Safety Tracker / training reset', measurement_mechanic: 'Safety Tracker / training reset' },
+  { id: 'ppe_compliance', category: 'quality_assurance', name: 'PPE Compliance', weightWithinCategory: 20, signal_source: 'Safety Tracker / training reset', measurement_mechanic: 'Safety Tracker / training reset' },
+  { id: 'logs_completion', category: 'quality_assurance', name: 'Logs Completion', weightWithinCategory: 20, signal_source: 'Safety Tracker → Ladle (future)', measurement_mechanic: 'Safety Tracker → Ladle (future)' },
+  { id: 'pic_required_trainings', category: 'quality_assurance', name: 'PIC / Required Trainings', weightWithinCategory: 20, signal_source: 'Food Safety Training Compliance', measurement_mechanic: 'Food Safety Training Compliance' },
 
-  // Employee Relations (3)
-  { id: 'emp_turnover', name: 'Staff turnover rate', category: 'employee_relations', unit: '%', direction: 'lower_better' },
-  { id: 'emp_training', name: 'Training completion rate', category: 'employee_relations', unit: '%', direction: 'higher_better' },
-  { id: 'emp_shifts_filled', name: 'Open shifts filled', category: 'employee_relations', unit: '%', direction: 'higher_better' },
+  // Employee Relations (3 KPIs → 33.33% each)
+  { id: 'attendance_reliability', category: 'employee_relations', name: 'Attendance / Reliability', weightWithinCategory: 33.33, signal_source: 'Track Path occurrence report', measurement_mechanic: 'Track Path occurrence report' },
+  { id: 'training_development', category: 'employee_relations', name: 'Training & Development', weightWithinCategory: 33.33, signal_source: 'LMS Group Training Tracker', measurement_mechanic: 'LMS Group Training Tracker' },
+  { id: 'engagement_retention', category: 'employee_relations', name: 'Engagement / Retention', weightWithinCategory: 33.33, signal_source: 'Visier', measurement_mechanic: 'Visier' },
 
-  // Customer Satisfaction (3)
-  { id: 'cust_survey', name: 'Student satisfaction survey', category: 'customer_satisfaction', unit: 'score', direction: 'higher_better' },
-  { id: 'cust_nps', name: 'Net promoter score', category: 'customer_satisfaction', unit: 'nps', direction: 'higher_better' },
-  { id: 'cust_complaint_time', name: 'Complaint resolution time', category: 'customer_satisfaction', unit: 'hrs', direction: 'lower_better' },
+  // Customer Satisfaction (2 KPIs → 50% each)
+  { id: 'guest_satisfaction_survey', category: 'customer_satisfaction', name: 'Guest Satisfaction Survey', weightWithinCategory: 50, signal_source: 'Student BITE', measurement_mechanic: 'Student BITE' },
+  { id: 'service_recovery_complaints', category: 'customer_satisfaction', name: 'Service Recovery / Complaints', weightWithinCategory: 50, signal_source: 'Emails, comment cards', measurement_mechanic: 'Emails, comment cards' },
 
-  // Sustainability (2)
-  { id: 'sus_compost', name: 'Compost diversion rate', category: 'sustainability', unit: '%', direction: 'higher_better' },
-  { id: 'sus_local', name: 'Local sourcing %', category: 'sustainability', unit: '%', direction: 'higher_better' },
+  // Sustainability (3 KPIs → 33.33% each)
+  { id: 'waste_diversion_recycling', category: 'sustainability', name: 'Waste Diversion / Recycling', weightWithinCategory: 33.33, signal_source: 'Café Manager Waste-Not tab', measurement_mechanic: 'Café Manager Waste-Not tab' },
+  { id: 'local_sustainable_sourcing', category: 'sustainability', name: 'Local / Sustainable Sourcing', weightWithinCategory: 33.33, signal_source: 'Café Manager Purchasing tab', measurement_mechanic: 'Café Manager Purchasing tab' },
+  { id: 'climate_change', category: 'sustainability', name: 'Climate Change', weightWithinCategory: 33.33, signal_source: 'Café Manager Climate Change', measurement_mechanic: 'Café Manager Climate Change' },
 ];
 
-export type Score = 'green' | 'yellow' | 'red';
-
-// Scoring thresholds on the spec's 1–3 scale.
-export const THRESHOLDS = {
-  green: 2.5, // >= 2.5
-  yellow: 1.5, // 1.5 – 2.49 (below green)
-  // red: < 1.5
-};
-
-/** Map a numeric score (1–3 scale) to a status color. */
-export function scoreToColor(value: number): Score {
-  if (value >= THRESHOLDS.green) return 'green';
-  if (value >= THRESHOLDS.yellow) return 'yellow';
-  return 'red';
-}
-
-/** Convenience: KPIs grouped by category key. */
+/** KPIs grouped by category key. */
 export function kpisByCategory(): Record<string, Kpi[]> {
   return KPIS.reduce((acc, kpi) => {
     (acc[kpi.category] ||= []).push(kpi);
