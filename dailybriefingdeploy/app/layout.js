@@ -13,8 +13,16 @@ export const metadata = {
   applicationName: 'MIT Dining Ops',
   manifest: '/manifest.json',
   icons: {
-    icon: '/icon-192.png',
-    apple: '/apple-touch-icon.png',
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icon-180.png', sizes: '180x180' },
+      { url: '/icon-167.png', sizes: '167x167' },
+      { url: '/icon-152.png', sizes: '152x152' },
+      { url: '/icon-120.png', sizes: '120x120' },
+    ],
   },
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'Dining Ops' },
 };

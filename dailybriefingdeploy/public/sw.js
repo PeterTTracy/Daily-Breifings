@@ -2,14 +2,16 @@
 // Strategy: cache-first for versioned static assets, network-first for API and
 // page navigations (so live ops data + the app shell never go stale), with a
 // cache fallback when offline.
-const CACHE = 'dining-ops-v1';
+// Bumped to v2 with the new app icons — old caches (incl. the previous icons)
+// are purged on activate.
+const CACHE = 'dining-ops-v2';
 const PRECACHE = [
   '/my-day',
   '/portfolio',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
-  '/apple-touch-icon.png',
+  '/icon-180.png',
 ];
 
 self.addEventListener('install', (event) => {
