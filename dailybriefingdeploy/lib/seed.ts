@@ -4,32 +4,85 @@
 
 export type HouseType = 'residential' | 'cluster' | 'retail';
 
+export interface HouseContact {
+  name: string;
+  role: string;
+  phone: string;
+  email: string;
+}
+
 export interface House {
   slug: string;
   name: string;
   type: HouseType;
   parent?: string | null; // parent cluster slug (for retail child cafés)
   parentSlug?: string | null;
-  ec_name?: string; // Executive Chef — placeholder until real assignments land
+  address?: string;
+  contacts?: HouseContact[]; // EC + FOH manager on-site contacts
+  ec_name?: string; // legacy — superseded by contacts[]
   contact?: string;
   active?: boolean;
 }
 
+// On-site management contacts, from Pete's contact list (cafebonappetit.com).
+const RETAIL_ADDRESS = '32 Vassar St, Cambridge, MA';
+const RETAIL_CONTACTS: HouseContact[] = [
+  { name: 'Michael Giovanoni', role: 'Chef Manager', phone: '508-322-0216', email: 'Michael.Giovanoni@cafebonappetit.com' },
+];
+
 export const HOUSES: House[] = [
-  { slug: 'maseeh', name: 'Maseeh', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
-  { slug: 'baker', name: 'Baker', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
+  {
+    slug: 'maseeh', name: 'Maseeh', type: 'residential', active: true,
+    address: '305 Memorial Dr, Cambridge, MA',
+    contacts: [
+      { name: 'Pedro Pomales Padro', role: 'Exec. Chef', phone: '617-997-5988', email: 'Pedro.Pomales-Padro@cafebonappetit.com' },
+      { name: 'Nic Bojarczuk', role: 'FOH Manager', phone: '857-452-5006', email: 'Nick.Bojarczuk@cafebonappetit.com' },
+    ],
+  },
+  {
+    slug: 'baker', name: 'Baker', type: 'residential', active: true,
+    address: '362 Memorial Dr, Cambridge, MA',
+    contacts: [
+      { name: 'Chimi Tangkhar', role: 'Sr. Sous Chef', phone: '857-205-5051', email: 'Chimi.Tangkhar@cafebonappetit.com' },
+      { name: 'Elizabeth Carlson', role: 'FOH Manager', phone: '978-590-0297', email: 'Elizabeth.Carlson@cafebonappetit.com' },
+    ],
+  },
   // McCormick is offline for ~2 years — deactivated (data kept, hidden everywhere).
   // Flip active back to true to restore it.
-  { slug: 'mccormick', name: 'McCormick', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: false },
-  { slug: 'next', name: 'Next', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
-  { slug: 'simmons', name: 'Simmons', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
-  { slug: 'new-vassar', name: 'New Vassar', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
-  { slug: 'retail', name: 'Retail', type: 'cluster', ec_name: 'TBD', contact: 'TBD', active: true },
+  { slug: 'mccormick', name: 'McCormick', type: 'residential', active: false },
+  {
+    slug: 'next', name: 'Next', type: 'residential', active: true,
+    address: '500 Memorial Dr, Cambridge, MA',
+    contacts: [
+      { name: 'Donley Liburd', role: 'Exec. Chef', phone: '781-500-1629', email: 'Donley.Liburd@cafebonappetit.com' },
+      { name: 'Natalie Biddle', role: 'FOH Manager', phone: '617-233-4150', email: 'Nathalie.Biddle@cafebonappetit.com' },
+    ],
+  },
+  {
+    slug: 'simmons', name: 'Simmons', type: 'residential', active: true,
+    address: '229 Vassar St, Cambridge, MA',
+    contacts: [
+      { name: 'Hector Vega', role: 'Exec. Chef', phone: '815-319-0263', email: 'Hector.Vega@cafebonappetit.com' },
+      { name: 'Maggie McCue', role: 'FOH Manager', phone: '617-233-4150', email: 'Margaret.Mccue@cafebonappetit.com' },
+    ],
+  },
+  {
+    slug: 'new-vassar', name: 'New Vassar', type: 'residential', active: true,
+    address: '189 Vassar St, Cambridge, MA',
+    contacts: [
+      { name: 'Marcos Noriega', role: 'Exec. Chef', phone: '857-334-5837', email: 'Marcos.Noriega@cafebonappetit.com' },
+      { name: 'Archantel Jean Pierre', role: 'FOH Manager', phone: '617-324-4982', email: 'Archantel.JeanPierre@cafebonappetit.com' },
+    ],
+  },
+  {
+    slug: 'retail', name: 'Retail', type: 'cluster', active: true,
+    address: RETAIL_ADDRESS, contacts: RETAIL_CONTACTS,
+  },
   // Retail child cafés — roll up into the Retail cluster (shown inside /house/retail,
-  // not as separate Portfolio cards).
-  { slug: 'forbes', name: 'Forbes Family Café', type: 'retail', parent: 'retail', active: true },
-  { slug: 'deans-beans', name: "Dean's Beans", type: 'retail', parent: 'retail', active: true },
-  { slug: 'bosworths', name: "Bosworth's", type: 'retail', parent: 'retail', active: true },
+  // not as separate Portfolio cards). They share the retail chef manager + address.
+  { slug: 'forbes', name: 'Forbes Family Café', type: 'retail', parent: 'retail', active: true, address: RETAIL_ADDRESS, contacts: RETAIL_CONTACTS },
+  { slug: 'deans-beans', name: "Dean's Beans", type: 'retail', parent: 'retail', active: true, address: RETAIL_ADDRESS, contacts: RETAIL_CONTACTS },
+  { slug: 'bosworths', name: "Bosworth's", type: 'retail', parent: 'retail', active: true, address: RETAIL_ADDRESS, contacts: RETAIL_CONTACTS },
 ];
 
 export const HOUSE_SLUGS = HOUSES.map((h) => h.slug);

@@ -13,11 +13,9 @@ const INGESTION_RUNS = [
   { source: 'gmail-pull', startedAt: '2026-06-03 18:31', status: 'success', rows: 9, error: null },
 ];
 
+// Pete's personal platform for now — single user.
 const USERS = [
-  { email: 'admin@dining.mit.edu', name: 'Pete Tracy', role: 'admin', defaultView: '/my-day' },
-  { email: 'ec.baker@dining.mit.edu', name: 'Baker EC', role: 'editor', defaultView: '/portfolio' },
-  { email: 'gm.simmons@dining.mit.edu', name: 'Simmons GM', role: 'editor', defaultView: '/portfolio' },
-  { email: 'viewer@dining.mit.edu', name: 'Read-only Viewer', role: 'viewer', defaultView: '/portfolio' },
+  { email: 'peter.tracy@cafebonappetit.com', name: 'Pete Tracy', role: 'admin', defaultView: '/my-day' },
 ];
 
 const HEALTH = [
