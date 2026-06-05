@@ -14,6 +14,9 @@ const ITEMS = [
 export default function Nav() {
   const pathname = usePathname() || '';
 
+  // The login wall is a standalone screen — no bottom nav there.
+  if (pathname === '/login') return null;
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur">
       <div className="mx-auto flex max-w-content items-stretch justify-around">

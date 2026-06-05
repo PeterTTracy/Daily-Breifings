@@ -1,8 +1,11 @@
+import { cookies } from 'next/headers';
 import './globals.css';
 import Providers from './providers';
 import Nav from './components/Nav';
 import ThemeToggle from './components/ThemeToggle';
 import InstallPrompt from './components/InstallPrompt';
+import LogoutButton from './components/LogoutButton';
+import { AUTH_COOKIE } from '../lib/site-auth';
 
 export const metadata = {
   title: 'MIT Dining Operations',
@@ -32,6 +35,9 @@ export const viewport = {
 const noFlashScript = `(function(){try{var t=localStorage.getItem('briefing-theme');var m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;if(t==='dark'||(!t&&m)){document.documentElement.classList.add('dark');}}catch(e){}})();`;
 
 export default function RootLayout({ children }) {
+  // Show the Sign-out button only when a session cookie is present.
+  const isAuthed = Boolean(cookies().get(AUTH_COOKIE)?.value);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -45,7 +51,10 @@ export default function RootLayout({ children }) {
                 <span className="h-3.5 w-3.5 rounded-[3px] bg-accent" aria-hidden="true" />
                 <span className="text-[13px] font-semibold tracking-tight text-ink">MIT Dining Ops</span>
               </div>
-              <ThemeToggle />
+              <div className="flex items-center gap-2">
+                {isAuthed && <LogoutButton />}
+                <ThemeToggle />
+              </div>
             </div>
           </header>
           <main className="mx-auto w-full max-w-content px-4 pb-28 pt-5">{children}</main>
