@@ -1,14 +1,16 @@
 import Link from 'next/link';
 import StatusDot from '../components/StatusDot';
 import TrendArrow from '../components/TrendArrow';
+import SeverityBadge from '../components/SeverityBadge';
 import { getStatusData, CURRENT_PERIOD } from '../../lib/data';
+import { getOpenIssues } from '../../lib/mock-issues';
 
 // Always render fresh from the database (no static caching of live scores).
 export const dynamic = 'force-dynamic';
 
 const YELLOW_LIMIT = 12;
 
-function StatusRow({ item }) {
+function KpiRow({ item }) {
   return (
     <Link
       href={`/house/${item.houseSlug}`}
@@ -31,35 +33,66 @@ function StatusRow({ item }) {
   );
 }
 
+function IssueRow({ issue }) {
+  return (
+    <Link
+      href={`/issue/${issue.id}`}
+      className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3 transition-colors hover:border-accent"
+    >
+      <div className="min-w-0">
+        <div className="truncate text-sm text-ink">{issue.title}</div>
+        <div className="text-[11px] text-muted">
+          {issue.houseName} · {issue.category}
+        </div>
+      </div>
+      <SeverityBadge severity={issue.severity} />
+    </Link>
+  );
+}
+
 export default async function StatusPage() {
   const { reds, yellows } = await getStatusData();
+  const issues = getOpenIssues();
   const shownYellows = yellows.slice(0, YELLOW_LIMIT);
   const extraYellows = yellows.length - shownYellows.length;
+  const allClear = issues.length === 0 && reds.length === 0 && yellows.length === 0;
 
   return (
     <div>
       <div className="mb-5 flex items-end justify-between">
         <h1 className="m-0 text-[22px] font-medium text-heading">Campus Status</h1>
         <div className="text-[11px] text-muted">
-          {CURRENT_PERIOD} · <span className="text-ink">{reds.length}</span> red ·{' '}
-          <span className="text-ink">{yellows.length}</span> yellow
+          {CURRENT_PERIOD} · <span className="text-ink">{issues.length}</span> issues ·{' '}
+          <span className="text-ink">{reds.length}</span> red · <span className="text-ink">{yellows.length}</span>{' '}
+          yellow
         </div>
       </div>
 
-      {reds.length === 0 && yellows.length === 0 && (
+      {allClear && (
         <div className="rounded-xl border border-line bg-surface p-8 text-center text-sm text-muted">
           All green across campus — nothing needs attention right now.
         </div>
       )}
 
+      {issues.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Open issues · {issues.length}</h2>
+          <div className="flex flex-col gap-2">
+            {issues.map((issue) => (
+              <IssueRow key={issue.id} issue={issue} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {reds.length > 0 && (
         <section className="mb-6">
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-            Needs attention · {reds.length}
+            KPIs needing attention · {reds.length}
           </h2>
           <div className="flex flex-col gap-2">
             {reds.map((item, i) => (
-              <StatusRow key={`r${i}`} item={item} />
+              <KpiRow key={`r${i}`} item={item} />
             ))}
           </div>
         </section>
@@ -67,12 +100,10 @@ export default async function StatusPage() {
 
       {shownYellows.length > 0 && (
         <section>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-            Watch · {yellows.length}
-          </h2>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Watch · {yellows.length}</h2>
           <div className="flex flex-col gap-2">
             {shownYellows.map((item, i) => (
-              <StatusRow key={`y${i}`} item={item} />
+              <KpiRow key={`y${i}`} item={item} />
             ))}
           </div>
           {extraYellows > 0 && (
