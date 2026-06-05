@@ -4,7 +4,8 @@ import TrendArrow from '../../components/TrendArrow';
 import HouseCategoryList from '../../components/HouseCategoryList';
 import BiteCard from '../../components/BiteCard';
 import AuditCard from '../../components/AuditCard';
-import { getHouseData } from '../../../lib/data';
+import ChildLocations from '../../components/ChildLocations';
+import { getHouseData, getChildren } from '../../../lib/data';
 import { getBite, BITE_MONTH, BITE_CAMPUS_AVG } from '../../../lib/bite-data';
 import { getChecklist } from '../../../lib/checklist-data';
 
@@ -34,6 +35,7 @@ export default async function HousePage({ params }) {
   const h = view.house;
   const bite = getBite(h.slug);
   const audit = getChecklist(h.slug);
+  const children = getChildren(h.slug);
 
   return (
     <div>
@@ -87,6 +89,15 @@ export default async function HousePage({ params }) {
 
       {bite && <BiteCard bite={bite} month={BITE_MONTH} campusAvg={BITE_CAMPUS_AVG} />}
       {audit && <AuditCard audit={audit} />}
+
+      {children.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+            Locations · {children.length}
+          </h2>
+          <ChildLocations locations={children} />
+        </section>
+      )}
     </div>
   );
 }

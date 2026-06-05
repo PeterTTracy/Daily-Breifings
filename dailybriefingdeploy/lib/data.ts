@@ -7,8 +7,14 @@ import { HOUSES } from './seed';
 import { computeHouseRollup, trendArrow } from './scoring';
 import { SCORECARD } from './scorecard-data';
 
-export const ACTIVE_HOUSES = HOUSES.filter((h) => h.active !== false);
-const isActive = (slug: string) => ACTIVE_HOUSES.some((h) => h.slug === slug);
+// Top-level houses shown in Portfolio / Status / nav: active and not a child café.
+export const ACTIVE_HOUSES = HOUSES.filter((h) => h.active !== false && !h.parent);
+const isInactive = (h?: { active?: boolean } | null) => Boolean(h && h.active === false);
+
+/** Active child locations of a cluster house (e.g. retail cafés). */
+export function getChildren(slug: string) {
+  return HOUSES.filter((h) => h.parent === slug && h.active !== false);
+}
 
 const periodNum = (p: string) => {
   const n = parseInt(String(p).replace(/[^0-9]/g, ''), 10);
@@ -35,10 +41,16 @@ const hasScores = (m: Record<string, number>) => Object.keys(m).length > 0;
 
 export function getPortfolioData() {
   const { current, previous } = getPeriods();
-  if (!current) return { period: null, previous: null, houses: [] as any[] };
 
-  const houses = ACTIVE_HOUSES.filter((h) => hasScores(scoreMap(current, h.slug))).map((h) => {
-    const c = computeHouseRollup(scoreMap(current, h.slug));
+  // Include every active top-level house. Houses without scorecard data (e.g. the
+  // Retail cluster, which only has audit/BITE data) still appear, flagged
+  // hasScorecard:false so the UI can show what we do have instead of hiding them.
+  const houses = ACTIVE_HOUSES.map((h) => {
+    const curMap = scoreMap(current, h.slug);
+    if (!current || !hasScores(curMap)) {
+      return { slug: h.slug, name: h.name, type: h.type, hasScorecard: false };
+    }
+    const c = computeHouseRollup(curMap);
     const prevMap = scoreMap(previous, h.slug);
     const p = computeHouseRollup(prevMap);
     const withPrev = hasScores(prevMap);
@@ -46,6 +58,7 @@ export function getPortfolioData() {
       slug: h.slug,
       name: h.name,
       type: h.type,
+      hasScorecard: true,
       score: c.score,
       color: c.color,
       trend: withPrev ? trendArrow(c.score, p.score) : 'flat',
@@ -68,8 +81,8 @@ export function getPortfolioData() {
 
 export function getHouseData(slug: string) {
   const houseAny = HOUSES.find((h) => h.slug === slug) || null;
-  const inactive = Boolean(houseAny && !isActive(slug));
-  const house = houseAny && isActive(slug) ? houseAny : null;
+  const inactive = isInactive(houseAny);
+  const house = houseAny && !inactive ? houseAny : null;
 
   const { current, previous } = getPeriods();
   const empty = {

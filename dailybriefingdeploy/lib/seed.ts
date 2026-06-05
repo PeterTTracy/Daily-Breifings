@@ -2,12 +2,13 @@
 // Houses, categories, and the 20 scorecard KPIs from Pete's spec.
 // Scoring thresholds and color logic live in lib/scoring.ts.
 
-export type HouseType = 'residential' | 'cluster';
+export type HouseType = 'residential' | 'cluster' | 'retail';
 
 export interface House {
   slug: string;
   name: string;
   type: HouseType;
+  parent?: string | null; // parent cluster slug (for retail child cafés)
   parentSlug?: string | null;
   ec_name?: string; // Executive Chef — placeholder until real assignments land
   contact?: string;
@@ -24,6 +25,11 @@ export const HOUSES: House[] = [
   { slug: 'simmons', name: 'Simmons', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
   { slug: 'new-vassar', name: 'New Vassar', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
   { slug: 'retail', name: 'Retail', type: 'cluster', ec_name: 'TBD', contact: 'TBD', active: true },
+  // Retail child cafés — roll up into the Retail cluster (shown inside /house/retail,
+  // not as separate Portfolio cards).
+  { slug: 'forbes', name: 'Forbes Family Café', type: 'retail', parent: 'retail', active: true },
+  { slug: 'deans-beans', name: "Dean's Beans", type: 'retail', parent: 'retail', active: true },
+  { slug: 'bosworths', name: "Bosworth's", type: 'retail', parent: 'retail', active: true },
 ];
 
 export const HOUSE_SLUGS = HOUSES.map((h) => h.slug);
