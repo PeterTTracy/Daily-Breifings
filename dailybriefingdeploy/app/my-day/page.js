@@ -88,6 +88,7 @@ export default function MyDay() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [pullRequested, setPullRequested] = useState(false);
 
   const fetchBriefing = useCallback(async () => {
     try {
@@ -212,12 +213,31 @@ export default function MyDay() {
       )}
 
       <div className="border-t border-line py-5 text-center">
-        <button
-          onClick={fetchBriefing}
-          className="rounded-lg border border-accent bg-surface px-6 py-2.5 text-[13px] text-accent"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center justify-center gap-2.5">
+          <button
+            onClick={fetchBriefing}
+            className="rounded-lg border border-accent bg-surface px-6 py-2.5 text-[13px] text-accent"
+          >
+            Refresh
+          </button>
+          <button
+            onClick={async () => {
+              setPullRequested(true);
+              try {
+                await fetch('/api/refresh', { method: 'POST' });
+              } catch (e) {}
+            }}
+            disabled={pullRequested}
+            className="rounded-lg border border-accent bg-surface px-6 py-2.5 text-[13px] text-accent disabled:opacity-50"
+          >
+            {pullRequested ? 'Pull requested ✓' : 'Request new pull'}
+          </button>
+        </div>
+        {pullRequested && (
+          <p className="mt-2 text-[11px] text-muted">
+            Claude will scan email/calendar and update this page within ~15 minutes.
+          </p>
+        )}
         {lastRefresh && <p className="mt-2 text-[11px] text-muted">Last updated {lastRefresh.toLocaleTimeString()}</p>}
       </div>
     </div>
