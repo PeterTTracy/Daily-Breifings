@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Icon from '../components/Icon';
 
 // Badge palettes keep the exact original colors, with explicit dark: variants
@@ -11,6 +11,10 @@ const BADGE = {
   fyi: 'bg-[#F1EFE8] text-[#5F5E5A] dark:bg-[#2a2a26] dark:text-[#B5B5AE]',
   done: 'bg-[#EAF3DE] text-[#3B6D11] dark:bg-[#1f3019] dark:text-[#9FD08A]',
 };
+
+const SWIPE_THRESHOLD = 80; // px before a swipe commits
+const PROMOTE_COLOR = '#2E75B6';
+const DISMISS_COLOR = '#E24B4A';
 
 function Badge({ type, children }) {
   return (
@@ -46,7 +50,99 @@ function ActionItem({ item, onToggle }) {
   );
 }
 
-// Compact single-meeting card for the "Next up" section at the bottom.
+// FYI row with swipe-to-act: swipe left to dismiss, right to promote.
+// Pure touch events + CSS transforms; desktop gets hover buttons.
+function SwipeableFyi({ item, onDismiss, onPromote }) {
+  const [dx, setDx] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const startX = useRef(0);
+
+  const onTouchStart = (e) => {
+    startX.current = e.touches[0].clientX;
+    setDragging(true);
+  };
+  const onTouchMove = (e) => {
+    if (!dragging) return;
+    setDx(e.touches[0].clientX - startX.current);
+  };
+  const onTouchEnd = () => {
+    setDragging(false);
+    if (dx <= -SWIPE_THRESHOLD) {
+      setDx(-600);
+      setTimeout(() => onDismiss(item.id), 180);
+    } else if (dx >= SWIPE_THRESHOLD) {
+      setDx(600);
+      setTimeout(() => onPromote(item.id), 180);
+    } else {
+      setDx(0);
+    }
+  };
+
+  const promoting = dx > 0;
+  const dismissing = dx < 0;
+
+  return (
+    <div className="relative mb-1 overflow-hidden rounded-xl">
+      {/* colored hint revealed behind the card */}
+      <div
+        className="absolute inset-0 rounded-xl"
+        style={{
+          background: promoting ? `${PROMOTE_COLOR}1a` : dismissing ? `${DISMISS_COLOR}1a` : 'transparent',
+        }}
+      />
+      <div className="pointer-events-none absolute inset-0 flex items-center px-4 text-[12px] font-medium">
+        {promoting && <span style={{ color: PROMOTE_COLOR }}>→ Promote to action</span>}
+        {dismissing && (
+          <span className="ml-auto" style={{ color: DISMISS_COLOR }}>
+            Dismiss ✕
+          </span>
+        )}
+      </div>
+
+      {/* foreground card */}
+      <div
+        className="group relative rounded-xl border border-line bg-surface p-3.5 opacity-90"
+        style={{
+          transform: `translateX(${dx}px)`,
+          transition: dragging ? 'none' : 'transform 0.18s ease-out',
+          touchAction: 'pan-y',
+        }}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        <p className="m-0 pr-14 text-[13px] text-ink">{item.description}</p>
+        <p className="mt-1 text-[11px] text-muted">
+          <Badge type="fyi">{item.priorityLabel}</Badge> {item.sender && <span> · {item.sender}</span>}{' '}
+          {item.age && <span> · {item.age}</span>}
+        </p>
+
+        {/* desktop hover controls */}
+        <div className="absolute right-2 top-2 hidden gap-1 group-hover:flex">
+          <button
+            onClick={() => onPromote(item.id)}
+            title="Promote to action item"
+            aria-label="Promote to action item"
+            className="rounded-md border border-line bg-pagebg px-1.5 py-0.5 text-[12px] font-semibold leading-none hover:bg-subtle"
+            style={{ color: PROMOTE_COLOR }}
+          >
+            →
+          </button>
+          <button
+            onClick={() => onDismiss(item.id)}
+            title="Dismiss"
+            aria-label="Dismiss"
+            className="rounded-md border border-line bg-pagebg px-1.5 py-0.5 text-[12px] font-semibold leading-none hover:bg-subtle"
+            style={{ color: DISMISS_COLOR }}
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NextUpCard({ event }) {
   return (
     <div
@@ -84,11 +180,45 @@ function StatCard({ num, label }) {
   );
 }
 
+function loadIdSet(key) {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const arr = JSON.parse(localStorage.getItem(key) || '[]');
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch (e) {
+    return new Set();
+  }
+}
+function saveIdSet(key, set) {
+  try {
+    localStorage.setItem(key, JSON.stringify([...set]));
+  } catch (e) {}
+}
+
 export default function MyDay() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastRefresh, setLastRefresh] = useState(null);
+
+  // FYI items the user has acted on (persisted so they survive briefing refreshes).
+  const [dismissedIds, setDismissedIds] = useState(() => loadIdSet('fyi-dismissed'));
+  const [promotedIds, setPromotedIds] = useState(() => loadIdSet('fyi-promoted'));
+
+  const dismissFyi = useCallback((id) => {
+    setDismissedIds((prev) => {
+      const next = new Set(prev).add(id);
+      saveIdSet('fyi-dismissed', next);
+      return next;
+    });
+  }, []);
+  const promoteFyi = useCallback((id) => {
+    setPromotedIds((prev) => {
+      const next = new Set(prev).add(id);
+      saveIdSet('fyi-promoted', next);
+      return next;
+    });
+  }, []);
 
   const fetchBriefing = useCallback(async () => {
     try {
@@ -144,8 +274,14 @@ export default function MyDay() {
       </div>
     );
 
-  const actionItems = (data.items || []).filter((i) => i.type !== 'fyi');
-  const fyi = (data.items || []).filter((i) => i.type === 'fyi');
+  const allItems = data.items || [];
+  const rawActions = allItems.filter((i) => i.type !== 'fyi');
+  // FYI items the user promoted become "today" action items.
+  const promotedFromFyi = allItems
+    .filter((i) => i.type === 'fyi' && promotedIds.has(i.id))
+    .map((i) => ({ ...i, type: 'action', priority: 'today', priorityLabel: 'TODAY' }));
+  const actionItems = [...rawActions, ...promotedFromFyi];
+  const fyi = allItems.filter((i) => i.type === 'fyi' && !dismissedIds.has(i.id) && !promotedIds.has(i.id));
   const completed = actionItems.filter((i) => i.completed).length;
   const pending = actionItems.filter((i) => !i.completed).length;
   const nextEvent = (data.calendar || [])[0];
@@ -159,6 +295,12 @@ export default function MyDay() {
           <div className="text-[11px] text-muted">{data.briefingType} briefing</div>
         </div>
       </div>
+
+      {nextEvent && (
+        <Section icon="calendar" title="Next up">
+          <NextUpCard event={nextEvent} />
+        </Section>
+      )}
 
       <div className="mb-6 grid grid-cols-2 gap-2.5">
         <StatCard num={pending} label="To do" />
@@ -195,20 +337,9 @@ export default function MyDay() {
       {fyi.length > 0 && (
         <Section icon="info" title="FYI">
           {fyi.map((i) => (
-            <div key={i.id} className="mb-1 rounded-xl border border-line bg-surface p-3.5 opacity-80">
-              <p className="m-0 text-[13px] text-ink">{i.description}</p>
-              <p className="mt-1 text-[11px] text-muted">
-                <Badge type="fyi">{i.priorityLabel}</Badge> {i.sender && <span> · {i.sender}</span>}{' '}
-                {i.age && <span> · {i.age}</span>}
-              </p>
-            </div>
+            <SwipeableFyi key={i.id} item={i} onDismiss={dismissFyi} onPromote={promoteFyi} />
           ))}
-        </Section>
-      )}
-
-      {nextEvent && (
-        <Section icon="calendar" title="Next up">
-          <NextUpCard event={nextEvent} />
+          <p className="mt-2 text-center text-[11px] text-muted">Swipe left to dismiss · right to promote</p>
         </Section>
       )}
 
@@ -224,4 +355,3 @@ export default function MyDay() {
     </div>
   );
 }
-
