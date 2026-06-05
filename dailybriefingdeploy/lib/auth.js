@@ -22,11 +22,10 @@ export const authOptions = {
       credentials: {
         email: { label: 'Email', type: 'text' },
       },
-      async authorize(credentials) {
-        // TODO: replace with Azure AD SSO. For now accept any email.
-        if (credentials?.email) {
-          return { id: 'stub-user', name: credentials.email, email: credentials.email };
-        }
+      async authorize() {
+        // Disabled until Azure AD SSO is wired up. Returning null prevents anyone
+        // from minting a session via this placeholder provider (was: accept any
+        // email — an auth-bypass once sessions are enforced). See security review.
         return null;
       },
     }),

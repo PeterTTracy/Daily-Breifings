@@ -46,11 +46,15 @@ self.addEventListener('fetch', (event) => {
   };
 
   // Network-first for API — always try fresh, fall back to cache when offline.
+  // Never persist sensitive responses (briefing PII, auth/session) to the cache.
   if (url.pathname.startsWith('/api/')) {
+    const sensitive = url.pathname.startsWith('/api/auth') || url.pathname.startsWith('/api/briefing');
     event.respondWith(
-      fetch(request)
-        .then((res) => putInCache(request, res))
-        .catch(() => caches.match(request))
+      sensitive
+        ? fetch(request)
+        : fetch(request)
+            .then((res) => putInCache(request, res))
+            .catch(() => caches.match(request))
     );
     return;
   }
