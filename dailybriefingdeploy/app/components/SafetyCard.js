@@ -4,7 +4,13 @@ import { completionRate } from '../../lib/safety-data';
 // Safety Findings card for a House View. Surfaces the 2026 Safety Tracker counts
 // for this house: open vs resolved, HIGH-priority load, and any flagged HIGH
 // findings with detail. This is the real evidence behind the QA KPIs.
-export default function SafetyCard({ safety, issues = [] }) {
+const RAG_BADGE = {
+  red: 'bg-[#FCEBEB] text-[#A32D2D] dark:bg-[#3a2020] dark:text-[#F0A3A3]',
+  yellow: 'bg-[#FAEEDA] text-[#854F0B] dark:bg-[#3a2e18] dark:text-[#E5BC7E]',
+  green: 'bg-[#EAF3DE] text-[#3B6D11] dark:bg-[#1f3019] dark:text-[#9FD08A]',
+};
+
+export default function SafetyCard({ safety, issues = [], risk = null }) {
   const rate = completionRate(safety); // 0–1
   const pct = Math.round(rate * 100);
   const resolvedColor = rate >= 0.6 ? 'bg-[#5a8f3c]' : rate >= 0.4 ? 'bg-[#C99A2E]' : 'bg-[#B5403F]';
@@ -15,6 +21,17 @@ export default function SafetyCard({ safety, issues = [] }) {
         Safety findings · 2026 Safety Tracker
       </h2>
       <div className="rounded-xl border border-line bg-surface p-4">
+        {risk && (
+          <div className="mb-3 flex items-center justify-between border-b border-line pb-3">
+            <span className="flex items-center gap-2">
+              <span className="text-[13px] text-muted">Risk score</span>
+              <span className="text-base font-semibold tabular-nums text-ink">{risk.riskScore}</span>
+            </span>
+            <span className={`rounded-md px-2 py-0.5 text-[12px] font-medium uppercase ${RAG_BADGE[risk.rag]}`}>
+              {risk.rag}
+            </span>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <div className="text-[13px] text-ink">
             <span className="text-sm font-medium tabular-nums">{safety.open}</span> open

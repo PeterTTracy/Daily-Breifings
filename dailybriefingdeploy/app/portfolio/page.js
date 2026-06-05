@@ -4,6 +4,8 @@ import TrendArrow from '../components/TrendArrow';
 import { getPortfolioData } from '../../lib/data';
 import { getChecklist, ratingColor } from '../../lib/checklist-data';
 import { getBite } from '../../lib/bite-data';
+import { getUnitRisk } from '../../lib/risk-scorecard-data';
+import RiskStrip from '../components/RiskStrip';
 
 // Always render fresh from the database (no static caching of live scores).
 export const dynamic = 'force-dynamic';
@@ -20,6 +22,7 @@ function typeLabel(type) {
 
 // Card for a house that has full scorecard KPIs (overall light + 6 category dots).
 function ScorecardCard({ h }) {
+  const risk = getUnitRisk(h.slug);
   return (
     <Link
       href={`/house/${h.slug}`}
@@ -51,6 +54,8 @@ function ScorecardCard({ h }) {
           </div>
         ))}
       </div>
+
+      <RiskStrip risk={risk} />
     </Link>
   );
 }
@@ -60,6 +65,7 @@ function ScorecardCard({ h }) {
 function NoScorecardCard({ h }) {
   const audit = getChecklist(h.slug);
   const bite = getBite(h.slug);
+  const risk = getUnitRisk(h.slug);
   const dot = audit ? ratingColor(audit.rating) : 'gray';
 
   return (
@@ -89,6 +95,8 @@ function NoScorecardCard({ h }) {
           {bite ? <span>{bite.stars.toFixed(1)}★ BITE</span> : null}
         </span>
       </div>
+
+      <RiskStrip risk={risk} />
     </Link>
   );
 }
