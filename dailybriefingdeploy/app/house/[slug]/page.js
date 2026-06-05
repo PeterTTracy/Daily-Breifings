@@ -2,10 +2,13 @@ import Link from 'next/link';
 import StatusDot from '../../components/StatusDot';
 import TrendArrow from '../../components/TrendArrow';
 import HouseCategoryList from '../../components/HouseCategoryList';
-import { getHouseView } from '../../../lib/mock-scores';
+import { getHouseData } from '../../../lib/data';
 
-export default function HousePage({ params }) {
-  const view = getHouseView(params.slug);
+// Always render fresh from the database (no static caching of live scores).
+export const dynamic = 'force-dynamic';
+
+export default async function HousePage({ params }) {
+  const view = await getHouseData(params.slug);
 
   if (!view.house) {
     return (

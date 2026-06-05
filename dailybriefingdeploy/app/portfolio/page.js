@@ -1,10 +1,13 @@
 import Link from 'next/link';
 import StatusDot from '../components/StatusDot';
 import TrendArrow from '../components/TrendArrow';
-import { getPortfolioView, CURRENT_PERIOD, PREVIOUS_PERIOD } from '../../lib/mock-scores';
+import { getPortfolioData, CURRENT_PERIOD, PREVIOUS_PERIOD } from '../../lib/data';
 
-export default function PortfolioPage() {
-  const houses = getPortfolioView();
+// Always render fresh from the database (no static caching of live scores).
+export const dynamic = 'force-dynamic';
+
+export default async function PortfolioPage() {
+  const houses = await getPortfolioData();
 
   return (
     <div>

@@ -16,7 +16,15 @@ export const isSupabaseConfigured: boolean = Boolean(url && anonKey);
  * Call sites should guard: `if (!supabase) { ... }`.
  */
 export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(url as string, anonKey as string)
+  ? createClient(url as string, anonKey as string, {
+      auth: { persistSession: false },
+      // Live ops data must never be served stale. Next.js caches `fetch` by
+      // default in Server Components; force no-store so every render reflects
+      // the current database state.
+      global: {
+        fetch: (input: any, init: any = {}) => fetch(input, { ...init, cache: 'no-store' }),
+      },
+    })
   : null;
 
 export default supabase;

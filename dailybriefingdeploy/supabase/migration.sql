@@ -107,5 +107,24 @@ create table if not exists audit_log (
 
 create index if not exists audit_log_entity_idx on audit_log (entity, entity_id);
 
--- NOTE: Row Level Security policies are intentionally deferred. Enable RLS and
--- add policies once Azure AD SSO + the users/role model are wired up.
+-- Row Level Security. Enable on every table; grant public SELECT only on the
+-- non-sensitive display tables (Portfolio + House views use the anon key).
+-- Writes are not granted to anon — ingestion uses the service role, which
+-- bypasses RLS. issues/users/ingestion_runs/audit_log stay default-deny until
+-- Azure AD SSO + the users/role model are wired up.
+alter table houses enable row level security;
+alter table kpi_definitions enable row level security;
+alter table scorecard_snapshots enable row level security;
+alter table issues enable row level security;
+alter table users enable row level security;
+alter table ingestion_runs enable row level security;
+alter table audit_log enable row level security;
+
+drop policy if exists "public read houses" on houses;
+create policy "public read houses" on houses for select using (true);
+
+drop policy if exists "public read kpi_definitions" on kpi_definitions;
+create policy "public read kpi_definitions" on kpi_definitions for select using (true);
+
+drop policy if exists "public read scorecard_snapshots" on scorecard_snapshots;
+create policy "public read scorecard_snapshots" on scorecard_snapshots for select using (true);
