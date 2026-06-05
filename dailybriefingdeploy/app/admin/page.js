@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../lib/auth';
 import StatusDot from '../components/StatusDot';
+import Icon from '../components/Icon';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,9 +38,12 @@ export default async function AdminPage() {
       <p className="mb-4 text-[13px] text-muted">Ingestion health, users &amp; roles, and system status.</p>
 
       {!session && (
-        <div className="mb-5 rounded-xl border border-line bg-subtle px-4 py-3 text-[13px] text-subtletext">
-          🔒 <span className="font-medium text-ink">Requires login.</span> Azure AD sign-in isn&rsquo;t enabled yet,
-          so this is a read-only preview. Once SSO is live, this page will require an admin session.
+        <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-line bg-subtle px-4 py-3 text-[13px] text-subtletext">
+          <Icon name="lock" size={15} strokeWidth={1.9} className="mt-[2px] shrink-0 text-muted" />
+          <div>
+            <span className="font-medium text-ink">Requires login.</span> Azure AD sign-in isn&rsquo;t enabled yet, so
+            this is a read-only preview. Once SSO is live, this page will require an admin session.
+          </div>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Icon from './Icon';
 
 // Toggles the `.dark` class on <html> and persists the choice. Initial class is
 // already set pre-paint by the no-flash script in layout.js; this just syncs the
@@ -26,9 +27,9 @@ export default function ThemeToggle() {
       onClick={toggle}
       aria-label="Toggle dark mode"
       title="Toggle dark mode"
-      className="rounded-lg border border-line px-2.5 py-1.5 text-[15px] leading-none text-ink transition-colors hover:bg-subtle"
+      className="flex items-center rounded-lg border border-line px-2.5 py-[7px] text-ink transition-colors hover:bg-subtle"
     >
-      {dark ? '☀️' : '🌙'}
+      <Icon name={dark ? 'sun' : 'moon'} size={16} strokeWidth={1.9} />
     </button>
   );
 }

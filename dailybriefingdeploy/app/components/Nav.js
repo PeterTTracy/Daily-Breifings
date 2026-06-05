@@ -1,14 +1,15 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import Icon from './Icon';
 
 // Mobile-friendly bottom navigation. Briefing leads — it's the home view.
 const ITEMS = [
-  { href: '/my-day', label: 'Briefing', icon: '📰' },
-  { href: '/portfolio', label: 'Portfolio', icon: '📊' },
-  { href: '/status', label: 'Status', icon: '📡' },
-  { href: '/house/maseeh', label: 'Houses', icon: '🏛️', match: '/house' },
-  { href: '/admin', label: 'Admin', icon: '⚙️' },
+  { href: '/my-day', label: 'Briefing', icon: 'briefing' },
+  { href: '/portfolio', label: 'Portfolio', icon: 'portfolio' },
+  { href: '/status', label: 'Status', icon: 'status' },
+  { href: '/house/maseeh', label: 'Houses', icon: 'houses', match: '/house' },
+  { href: '/admin', label: 'Admin', icon: 'admin' },
 ];
 
 export default function Nav() {
@@ -34,7 +35,7 @@ export default function Nav() {
               {active && (
                 <span className="absolute inset-x-4 top-0 h-[2px] rounded-full bg-accent" aria-hidden="true" />
               )}
-              <span className="text-[17px] leading-none">{item.icon}</span>
+              <Icon name={item.icon} size={21} strokeWidth={active ? 2.1 : 1.8} />
               <span>{item.label}</span>
             </Link>
           );

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import Icon from '../components/Icon';
 
 // Badge palettes keep the exact original colors, with explicit dark: variants
 // since these are accent chips (not the CSS-variable-backed semantic surfaces).
@@ -65,7 +66,7 @@ function Section({ icon, title, badge, children }) {
   return (
     <div className="mb-6">
       <div className="mb-2.5 flex items-center gap-2 border-b border-line pb-1.5">
-        <span className="text-lg">{icon}</span>
+        <Icon name={icon} size={17} strokeWidth={1.9} className="text-accent" />
         <span className="text-base font-medium text-ink">{title}</span>
         {badge}
       </div>
@@ -165,7 +166,7 @@ export default function MyDay() {
       </div>
 
       {actionItems.length > 0 && (
-        <Section icon="📬" title="Action items" badge={<Badge type="urgent">{pending} pending</Badge>}>
+        <Section icon="inbox" title="Action items" badge={<Badge type="urgent">{pending} pending</Badge>}>
           {actionItems
             .filter((i) => !i.completed)
             .map((i) => (
@@ -192,7 +193,7 @@ export default function MyDay() {
       )}
 
       {fyi.length > 0 && (
-        <Section icon="ℹ️" title="FYI">
+        <Section icon="info" title="FYI">
           {fyi.map((i) => (
             <div key={i.id} className="mb-1 rounded-xl border border-line bg-surface p-3.5 opacity-80">
               <p className="m-0 text-[13px] text-ink">{i.description}</p>
@@ -206,7 +207,7 @@ export default function MyDay() {
       )}
 
       {nextEvent && (
-        <Section icon="📅" title="Next up">
+        <Section icon="calendar" title="Next up">
           <NextUpCard event={nextEvent} />
         </Section>
       )}
