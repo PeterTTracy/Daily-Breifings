@@ -45,6 +45,16 @@ export const CATEGORIES: Category[] = [
 
 export type CategoryKey = (typeof CATEGORIES)[number]['key'];
 
+// Owning team per category (from the "Individual House Scorecard" Owner column).
+export const CATEGORY_OWNERS: Record<CategoryKey, string> = {
+  nutrition_programming: 'Culinary and Wellness Team',
+  sustainability: 'Culinary and Wellness Team',
+  financial_performance: 'Operations and Financial Teams',
+  quality_assurance: 'Operations and Culinary Team',
+  customer_satisfaction: 'Operations and Culinary Team',
+  employee_relations: 'Operations and Culinary Team',
+};
+
 export interface Kpi {
   id: string;
   category: CategoryKey;
@@ -54,10 +64,12 @@ export interface Kpi {
   signal_source: string;
   /** Per spec, store the signal-source string as the measurement mechanic for now. */
   measurement_mechanic: string;
+  /** Owning team (derived from category). */
+  owner: string;
 }
 
-// 20 KPIs from the spec. Equal weight within each category.
-export const KPIS: Kpi[] = [
+// 20 KPIs from the spec, defined without owner; owner is injected by category below.
+const KPI_DEFS: Omit<Kpi, 'owner'>[] = [
   // Nutrition / Programming (2 KPIs → 50% each)
   { id: 'menu_compliance', category: 'nutrition_programming', name: 'Menu Compliance / BITE Standards', weightWithinCategory: 50, signal_source: 'Café Manager Menu Page', measurement_mechanic: 'Café Manager Menu Page' },
   { id: 'special_diet_allergen', category: 'nutrition_programming', name: 'Special Diet & Allergen Execution', weightWithinCategory: 50, signal_source: 'Café Manager Menu Page', measurement_mechanic: 'Café Manager Menu Page' },
@@ -90,6 +102,8 @@ export const KPIS: Kpi[] = [
   { id: 'local_sustainable_sourcing', category: 'sustainability', name: 'Local / Sustainable Sourcing', weightWithinCategory: 33.33, signal_source: 'Café Manager Purchasing tab', measurement_mechanic: 'Café Manager Purchasing tab' },
   { id: 'climate_change', category: 'sustainability', name: 'Climate Change', weightWithinCategory: 33.33, signal_source: 'Café Manager Climate Change', measurement_mechanic: 'Café Manager Climate Change' },
 ];
+
+export const KPIS: Kpi[] = KPI_DEFS.map((k) => ({ ...k, owner: CATEGORY_OWNERS[k.category] }));
 
 /** KPIs grouped by category key. */
 export function kpisByCategory(): Record<string, Kpi[]> {

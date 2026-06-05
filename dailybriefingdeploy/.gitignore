@@ -4,3 +4,7 @@ node_modules/
 .env
 .env.local
 .env.production.local
+
+# Operational scorecard spreadsheets (contain operational data) + generated SQL
+data/*.xlsx
+data/*.sql
