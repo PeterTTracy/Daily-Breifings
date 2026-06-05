@@ -36,15 +36,23 @@ export default async function HousePage({ params }) {
           <div>
             <h1 className="m-0 text-[22px] font-medium text-heading">{h.name}</h1>
             <div className="text-xs text-muted">
-              {h.type === 'cluster' ? 'Retail cluster' : 'Residential house'} · {view.period}{' '}
-              <span className="opacity-60">vs {view.prev}</span>
+              {h.type === 'cluster' ? 'Retail cluster' : 'Residential house'}
+              {view.hasData && view.period ? (
+                <>
+                  {' '}
+                  · {view.period}
+                  {view.prev ? <span className="opacity-60"> vs {view.prev}</span> : null}
+                </>
+              ) : null}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-sm">
-          <span className="tabular-nums text-muted">{view.score.toFixed(2)}</span>
-          <TrendArrow trend={view.trend} />
-        </div>
+        {view.hasData && (
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="tabular-nums text-muted">{view.score.toFixed(2)}</span>
+            <TrendArrow trend={view.trend} />
+          </div>
+        )}
       </div>
 
       <div className="mb-5 rounded-xl border border-line bg-subtle px-3.5 py-2.5 text-[13px]">
@@ -53,7 +61,16 @@ export default async function HousePage({ params }) {
         <span className="text-ink">{h.contact || 'TBD'}</span>
       </div>
 
-      <HouseCategoryList categories={view.categories} />
+      {view.hasData ? (
+        <HouseCategoryList categories={view.categories} />
+      ) : (
+        <div className="rounded-xl border border-line bg-surface p-8 text-center">
+          <p className="m-0 text-sm text-ink">No scorecard data yet for {h.name}.</p>
+          <p className="mx-auto mt-1 max-w-xs text-[13px] text-muted">
+            Scores will appear here once the latest scorecard is uploaded.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

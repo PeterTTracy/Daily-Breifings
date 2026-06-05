@@ -1,20 +1,35 @@
 import Link from 'next/link';
 import StatusDot from '../components/StatusDot';
 import TrendArrow from '../components/TrendArrow';
-import { getPortfolioData, CURRENT_PERIOD, PREVIOUS_PERIOD } from '../../lib/data';
+import { getPortfolioData } from '../../lib/data';
 
 // Always render fresh from the database (no static caching of live scores).
 export const dynamic = 'force-dynamic';
 
 export default async function PortfolioPage() {
-  const houses = await getPortfolioData();
+  const { period, previous, houses } = await getPortfolioData();
+
+  if (!houses.length) {
+    return (
+      <div>
+        <h1 className="m-0 mb-5 text-[22px] font-medium text-heading">Portfolio</h1>
+        <div className="rounded-xl border border-line bg-surface p-8 text-center">
+          <p className="m-0 text-sm text-ink">No scorecard data yet.</p>
+          <p className="mx-auto mt-1 max-w-xs text-[13px] text-muted">
+            Upload the latest scorecard to populate house lights and trends.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className="mb-5 flex items-end justify-between">
         <h1 className="m-0 text-[22px] font-medium text-heading">Portfolio</h1>
         <div className="text-[11px] text-muted">
-          {CURRENT_PERIOD} <span className="opacity-60">vs {PREVIOUS_PERIOD}</span>
+          {period}
+          {previous ? <span className="opacity-60"> vs {previous}</span> : null}
         </div>
       </div>
 
