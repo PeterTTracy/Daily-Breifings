@@ -2,9 +2,12 @@ import Link from 'next/link';
 import StatusDot from '../../components/StatusDot';
 import TrendArrow from '../../components/TrendArrow';
 import HouseCategoryList from '../../components/HouseCategoryList';
+import BiteCard from '../../components/BiteCard';
+import AuditCard from '../../components/AuditCard';
 import { getHouseData } from '../../../lib/data';
+import { getBite, BITE_MONTH, BITE_CAMPUS_AVG } from '../../../lib/bite-data';
+import { getChecklist } from '../../../lib/checklist-data';
 
-// Always render fresh from the database (no static caching of live scores).
 export const dynamic = 'force-dynamic';
 
 export default async function HousePage({ params }) {
@@ -13,8 +16,14 @@ export default async function HousePage({ params }) {
   if (!view.house) {
     return (
       <div className="py-12 text-center">
-        <h1 className="m-0 text-xl font-medium text-heading">Unknown house</h1>
-        <p className="mt-2 text-sm text-muted">&ldquo;{params.slug}&rdquo; isn&rsquo;t a known house.</p>
+        <h1 className="m-0 text-xl font-medium text-heading">
+          {view.inactive ? 'House offline' : 'Unknown house'}
+        </h1>
+        <p className="mt-2 text-sm text-muted">
+          {view.inactive
+            ? `${params.slug} is currently offline and hidden from the app.`
+            : `“${params.slug}” isn’t a known house.`}
+        </p>
         <Link href="/portfolio" className="mt-4 inline-block text-sm text-accent">
           ← Back to Portfolio
         </Link>
@@ -23,6 +32,8 @@ export default async function HousePage({ params }) {
   }
 
   const h = view.house;
+  const bite = getBite(h.slug);
+  const audit = getChecklist(h.slug);
 
   return (
     <div>
@@ -62,15 +73,20 @@ export default async function HousePage({ params }) {
       </div>
 
       {view.hasData ? (
-        <HouseCategoryList categories={view.categories} />
+        <div className="mb-6">
+          <HouseCategoryList categories={view.categories} />
+        </div>
       ) : (
-        <div className="rounded-xl border border-line bg-surface p-8 text-center">
+        <div className="mb-6 rounded-xl border border-line bg-surface p-8 text-center">
           <p className="m-0 text-sm text-ink">No scorecard data yet for {h.name}.</p>
           <p className="mx-auto mt-1 max-w-xs text-[13px] text-muted">
             Scores will appear here once the latest scorecard is uploaded.
           </p>
         </div>
       )}
+
+      {bite && <BiteCard bite={bite} month={BITE_MONTH} campusAvg={BITE_CAMPUS_AVG} />}
+      {audit && <AuditCard audit={audit} />}
     </div>
   );
 }

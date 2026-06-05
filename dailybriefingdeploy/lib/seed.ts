@@ -17,7 +17,9 @@ export interface House {
 export const HOUSES: House[] = [
   { slug: 'maseeh', name: 'Maseeh', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
   { slug: 'baker', name: 'Baker', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
-  { slug: 'mccormick', name: 'McCormick', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
+  // McCormick is offline for ~2 years — deactivated (data kept, hidden everywhere).
+  // Flip active back to true to restore it.
+  { slug: 'mccormick', name: 'McCormick', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: false },
   { slug: 'next', name: 'Next', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
   { slug: 'simmons', name: 'Simmons', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },
   { slug: 'new-vassar', name: 'New Vassar', type: 'residential', ec_name: 'TBD', contact: 'TBD', active: true },

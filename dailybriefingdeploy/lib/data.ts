@@ -1,60 +1,47 @@
-// Data access layer for Portfolio + House + Status views.
-// Reads live scorecard data from Supabase only — no mock fallback. Returns empty
-// results until scorecard_snapshots is populated (e.g. by a scorecard upload),
-// so the UI shows clean "no data yet" states instead of fabricated scores.
-import { supabase } from './supabase';
+// Data access layer for Portfolio / House / Status views.
+// Reads the hardcoded scorecard (lib/scorecard-data.ts) so the deployed app
+// renders real data without a DB connection. Inactive houses (e.g. McCormick,
+// offline) are filtered out everywhere. The "current" period is the latest one
+// that actually has scores (so a blank P8 template doesn't override real P7).
 import { HOUSES } from './seed';
 import { computeHouseRollup, trendArrow } from './scoring';
+import { SCORECARD } from './scorecard-data';
 
-function periodNum(p: string): number {
+export const ACTIVE_HOUSES = HOUSES.filter((h) => h.active !== false);
+const isActive = (slug: string) => ACTIVE_HOUSES.some((h) => h.slug === slug);
+
+const periodNum = (p: string) => {
   const n = parseInt(String(p).replace(/[^0-9]/g, ''), 10);
   return Number.isNaN(n) ? 0 : n;
-}
+};
 
-/** The two most recent periods present in scorecard_snapshots (numeric order). */
-export async function getPeriods(): Promise<{ current: string | null; previous: string | null }> {
-  if (!supabase) return { current: null, previous: null };
-  const { data, error } = await supabase.from('scorecard_snapshots').select('period');
-  if (error) throw error;
-  const periods = [...new Set((data as any[] | null || []).map((r) => r.period as string))].sort(
-    (a, b) => periodNum(a) - periodNum(b)
-  );
+const hasRealScores = (period: string) =>
+  Object.values(SCORECARD[period] || {}).some((m) => Object.values(m).some((v) => v > 0));
+
+/** Latest two periods that have real (non-zero) scores. */
+export function getPeriods(): { current: string | null; previous: string | null } {
+  const all = Object.keys(SCORECARD).sort((a, b) => periodNum(a) - periodNum(b));
+  const withData = all.filter(hasRealScores);
+  const ordered = withData.length ? withData : all; // fall back to any period if none filled
   return {
-    current: periods.length ? periods[periods.length - 1] : null,
-    previous: periods.length > 1 ? periods[periods.length - 2] : null,
+    current: ordered.length ? ordered[ordered.length - 1] : null,
+    previous: ordered.length > 1 ? ordered[ordered.length - 2] : null,
   };
 }
 
-// { houseSlug: { kpiId: score } } for a single period, from Supabase.
-async function fetchPeriodScoreMaps(period: string | null): Promise<Record<string, Record<string, number>>> {
-  if (!supabase || !period) return {};
-  const { data, error } = await supabase
-    .from('scorecard_snapshots')
-    .select('score_0_3, kpi_id, houses(slug)')
-    .eq('period', period);
-  if (error) throw error;
+const scoreMap = (period: string | null, slug: string): Record<string, number> =>
+  (period && SCORECARD[period]?.[slug]) || {};
+const hasScores = (m: Record<string, number>) => Object.keys(m).length > 0;
 
-  const maps: Record<string, Record<string, number>> = {};
-  for (const row of (data as any[]) || []) {
-    const slug = row.houses?.slug;
-    if (!slug) continue;
-    (maps[slug] ||= {})[row.kpi_id] = Number(row.score_0_3);
-  }
-  return maps;
-}
-
-const hasScores = (m: Record<string, number> | undefined) => Boolean(m && Object.keys(m).length);
-
-export async function getPortfolioData() {
-  const { current, previous } = await getPeriods();
+export function getPortfolioData() {
+  const { current, previous } = getPeriods();
   if (!current) return { period: null, previous: null, houses: [] as any[] };
 
-  const [cur, prv] = await Promise.all([fetchPeriodScoreMaps(current), fetchPeriodScoreMaps(previous)]);
-
-  const houses = HOUSES.filter((h) => hasScores(cur[h.slug])).map((h) => {
-    const c = computeHouseRollup(cur[h.slug]);
-    const p = computeHouseRollup(prv[h.slug] || {});
-    const withPrev = hasScores(prv[h.slug]);
+  const houses = ACTIVE_HOUSES.filter((h) => hasScores(scoreMap(current, h.slug))).map((h) => {
+    const c = computeHouseRollup(scoreMap(current, h.slug));
+    const prevMap = scoreMap(previous, h.slug);
+    const p = computeHouseRollup(prevMap);
+    const withPrev = hasScores(prevMap);
     return {
       slug: h.slug,
       name: h.name,
@@ -79,12 +66,15 @@ export async function getPortfolioData() {
   return { period: current, previous, houses };
 }
 
-export async function getHouseData(slug: string) {
-  const house = HOUSES.find((h) => h.slug === slug) || null;
-  const { current, previous } = await getPeriods();
+export function getHouseData(slug: string) {
+  const houseAny = HOUSES.find((h) => h.slug === slug) || null;
+  const inactive = Boolean(houseAny && !isActive(slug));
+  const house = houseAny && isActive(slug) ? houseAny : null;
 
+  const { current, previous } = getPeriods();
   const empty = {
     house,
+    inactive,
     period: current,
     prev: previous,
     hasData: false,
@@ -93,15 +83,15 @@ export async function getHouseData(slug: string) {
     trend: 'flat' as const,
     categories: [] as any[],
   };
-  if (!current) return empty;
+  if (!house || !current) return empty;
 
-  const [cur, prv] = await Promise.all([fetchPeriodScoreMaps(current), fetchPeriodScoreMaps(previous)]);
-  const curMap = cur[slug] || {};
+  const curMap = scoreMap(current, slug);
   if (!hasScores(curMap)) return empty;
 
   const c = computeHouseRollup(curMap);
-  const p = computeHouseRollup(prv[slug] || {});
-  const withPrev = hasScores(prv[slug]);
+  const prevMap = scoreMap(previous, slug);
+  const p = computeHouseRollup(prevMap);
+  const withPrev = hasScores(prevMap);
 
   const categories = c.categories.map((cat) => {
     const pc = p.categories.find((x) => x.key === cat.key);
@@ -120,7 +110,7 @@ export async function getHouseData(slug: string) {
     };
   });
 
-  return { house, period: current, prev: previous, hasData: true, score: c.score, color: c.color, trend: withPrev ? trendArrow(c.score, p.score) : 'flat', categories };
+  return { house, inactive: false, period: current, prev: previous, hasData: true, score: c.score, color: c.color, trend: withPrev ? trendArrow(c.score, p.score) : 'flat', categories };
 }
 
 export interface StatusItem {
@@ -133,21 +123,20 @@ export interface StatusItem {
   trend: 'up' | 'down' | 'flat';
 }
 
-// Campus Status board: every non-green KPI across all houses (current period),
-// split into reds (needs attention) and yellows (watch), each sorted worst-first.
-export async function getStatusData() {
-  const { current, previous } = await getPeriods();
+export function getStatusData() {
+  const { current, previous } = getPeriods();
   if (!current) return { period: null as string | null, reds: [] as StatusItem[], yellows: [] as StatusItem[] };
 
-  const [cur, prv] = await Promise.all([fetchPeriodScoreMaps(current), fetchPeriodScoreMaps(previous)]);
   const reds: StatusItem[] = [];
   const yellows: StatusItem[] = [];
 
-  for (const h of HOUSES) {
-    if (!hasScores(cur[h.slug])) continue;
-    const c = computeHouseRollup(cur[h.slug]);
-    const p = computeHouseRollup(prv[h.slug] || {});
-    const withPrev = hasScores(prv[h.slug]);
+  for (const h of ACTIVE_HOUSES) {
+    const curMap = scoreMap(current, h.slug);
+    if (!hasScores(curMap)) continue;
+    const c = computeHouseRollup(curMap);
+    const prevMap = scoreMap(previous, h.slug);
+    const p = computeHouseRollup(prevMap);
+    const withPrev = hasScores(prevMap);
     for (const cat of c.categories) {
       const pc = p.categories.find((x) => x.key === cat.key);
       for (const kpi of cat.kpis) {
