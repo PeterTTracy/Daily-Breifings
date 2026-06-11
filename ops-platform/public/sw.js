@@ -1,12 +1,12 @@
-// Daily Briefing service worker.
+// MIT Dining Ops service worker.
 // Strategy: cache-first for versioned static assets, network-first for API and
-// page navigations (so the briefing + app shell never go stale), with a cache
-// fallback when offline.
-// Bumped to briefing-v3 for the briefing/ops split — old dining-ops caches are
+// page navigations (so live ops data + the app shell never go stale), with a
+// cache fallback when offline.
+// Bumped to v3 for the briefing/ops split — old caches (incl. /my-day) are
 // purged on activate.
-const CACHE = 'briefing-v3';
+const CACHE = 'dining-ops-v3';
 const PRECACHE = [
-  '/',
+  '/portfolio',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
@@ -49,7 +49,7 @@ self.addEventListener('fetch', (event) => {
   // Network-first for API — always try fresh, fall back to cache when offline.
   // Never persist sensitive responses (briefing PII, auth/session) to the cache.
   if (url.pathname.startsWith('/api/')) {
-    const sensitive = url.pathname.startsWith('/api/auth') || url.pathname.startsWith('/api/briefing');
+    const sensitive = url.pathname.startsWith('/api/auth');
     event.respondWith(
       sensitive
         ? fetch(request)
@@ -75,6 +75,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(request)
       .then((res) => putInCache(request, res))
-      .catch(() => caches.match(request).then((c) => c || caches.match('/')))
+      .catch(() => caches.match(request).then((c) => c || caches.match('/portfolio')))
   );
 });

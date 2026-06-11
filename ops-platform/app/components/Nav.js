@@ -3,9 +3,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Icon from './Icon';
 
-// Mobile-friendly bottom navigation. Briefing leads — it's the home view.
+// Mobile-friendly bottom navigation. Portfolio leads — it's the home view.
 const ITEMS = [
-  { href: '/my-day', label: 'Briefing', icon: 'briefing' },
   { href: '/portfolio', label: 'Portfolio', icon: 'portfolio' },
   { href: '/status', label: 'Status', icon: 'status' },
   { href: '/house/maseeh', label: 'Houses', icon: 'houses', match: '/house' },

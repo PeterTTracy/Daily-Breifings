@@ -1,8 +1,8 @@
 {
-  "name": "Daily Briefing",
-  "short_name": "Briefing",
-  "description": "Morning briefing — prioritized action items, FYIs, and the next meeting.",
-  "start_url": "/",
+  "name": "MIT Dining Operations",
+  "short_name": "MIT Dining",
+  "description": "House scorecards, safety risk, and campus dining operations.",
+  "start_url": "/portfolio",
   "scope": "/",
   "display": "standalone",
   "background_color": "#141619",

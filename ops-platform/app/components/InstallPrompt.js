@@ -59,11 +59,11 @@ export default function InstallPrompt() {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-4 z-50 px-4">
+    <div className="fixed inset-x-0 bottom-[68px] z-50 px-4">
       <div className="mx-auto flex max-w-content items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 shadow-lg">
         <span className="h-8 w-8 shrink-0 rounded-md bg-accent" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <p className="m-0 text-[13px] font-medium text-ink">Install Daily Briefing</p>
+          <p className="m-0 text-[13px] font-medium text-ink">Install MIT Dining Ops</p>
           <p className="m-0 text-[11px] text-muted">Add to your home screen for quick access.</p>
         </div>
         <button onClick={dismiss} className="rounded-lg px-2.5 py-1.5 text-[12px] text-muted hover:text-ink">

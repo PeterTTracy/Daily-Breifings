@@ -12,12 +12,9 @@ export async function middleware(request) {
   // Always allowed, even without a cookie:
   //  - the login page itself
   //  - the auth endpoints (login/logout + NextAuth)
-  //  - POST /api/briefing — the scheduled task authenticates with x-api-key in
-  //    the route handler, NOT the cookie, so it must bypass the gate.
   const isLogin = pathname === '/login';
   const isAuthApi = pathname.startsWith('/api/auth/');
-  const isSchedulerPost = pathname === '/api/briefing' && request.method === 'POST';
-  if (isLogin || isAuthApi || isSchedulerPost) {
+  if (isLogin || isAuthApi) {
     return NextResponse.next();
   }
 
@@ -37,8 +34,8 @@ export async function middleware(request) {
 }
 
 export const config = {
-  // Run on everything EXCEPT static assets — this now includes /api/* so that
-  // GET /api/briefing and /api/complete are gated. Static/PWA assets stay open
+  // Run on everything EXCEPT static assets — /api/* is gated too. Static/PWA
+  // assets stay open
   // so the login page and the installable app can load without auth.
   matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|icon-|apple-touch-icon).*)'],
 };
