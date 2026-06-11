@@ -20,7 +20,7 @@ export default function LoginPage() {
       });
       if (res.ok) {
         // Read the original destination (set by the middleware redirect).
-        let dest = '/';
+        let dest = '/portfolio';
         try {
           const from = new URLSearchParams(window.location.search).get('from');
           if (from && from.startsWith('/') && !from.startsWith('//')) dest = from;
@@ -46,7 +46,7 @@ export default function LoginPage() {
       >
         <div className="mb-4 flex items-center justify-center gap-2">
           <span className="h-4 w-4 rounded-[3px] bg-accent" aria-hidden="true" />
-          <span className="text-sm font-semibold tracking-tight text-ink">Daily Briefing</span>
+          <span className="text-sm font-semibold tracking-tight text-ink">MIT Dining Operations</span>
         </div>
         <h1 className="m-0 text-lg font-medium text-heading">Sign in</h1>
         <p className="mb-5 mt-1 text-[13px] text-muted">Enter the team password to continue.</p>

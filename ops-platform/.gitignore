@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.vercel/
+tsconfig.tsbuildinfo
+.env
+.env.local
+.env.production.local
+
+# Operational scorecard spreadsheets (contain operational data) + generated SQL
+data/*.xlsx
+data/*.sql

@@ -15,13 +15,11 @@ const INGESTION_RUNS = [
 
 // Pete's personal platform for now — single user.
 const USERS = [
-  { email: 'peter.tracy@cafebonappetit.com', name: 'Pete Tracy', role: 'admin', defaultView: '/my-day' },
+  { email: 'peter.tracy@cafebonappetit.com', name: 'Pete Tracy', role: 'admin', defaultView: '/portfolio' },
 ];
 
 const HEALTH = [
   { label: 'Supabase', ok: true, note: 'connected' },
-  { label: 'Vercel KV', ok: true, note: 'connected' },
-  { label: 'Last briefing pull', ok: true, note: '06:02 today' },
   { label: 'Scorecard ingestion', ok: false, note: 'P9 file pending' },
 ];
 
