@@ -15,6 +15,7 @@ const BADGE = {
 const SWIPE_THRESHOLD = 80; // px before a swipe commits
 const PROMOTE_COLOR = '#2E75B6';
 const DISMISS_COLOR = '#E24B4A';
+const PULL_TRIGGER = 64; // px of pull before release triggers a refresh
 
 const PRIORITY_PILLS = [
   { key: 'urgent', label: 'Urgent', cls: BADGE.urgent },
@@ -22,6 +23,9 @@ const PRIORITY_PILLS = [
   { key: 'week', label: 'This week', cls: BADGE.week },
 ];
 const PRIORITY_LABELS = { urgent: 'URGENT', today: 'TODAY', week: 'THIS WEEK' };
+// Triage order: urgent first, unknown priorities sink to the bottom.
+const PRIORITY_RANK = { urgent: 0, today: 1, week: 2 };
+const rank = (i) => (i.priority in PRIORITY_RANK ? PRIORITY_RANK[i.priority] : 3);
 
 function Badge({ type, children }) {
   return (
@@ -40,6 +44,39 @@ function relAge(ts) {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+// "Thursday, June 11, 2026" → "Thu, Jun 11". Falls back to the raw string if
+// the pipeline ever sends a format Date can't parse.
+function shortDate(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  if (Number.isNaN(d.getTime())) return str;
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// "Karen.Vaillancourt@trimarkusa.com" → "Karen Vaillancourt". Non-email senders
+// (e.g. "MITChefs group") pass through unchanged.
+function senderName(sender) {
+  if (!sender || !sender.includes('@')) return sender;
+  const local = sender.split('@')[0].replace(/[._-]+/g, ' ').trim();
+  return local.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Sender as a tappable mailto link (one-tap reply) showing just the name.
+function SenderLink({ sender }) {
+  if (!sender) return null;
+  if (!sender.includes('@')) return <span>{sender}</span>;
+  return (
+    <a
+      href={`mailto:${sender}`}
+      onClick={(e) => e.stopPropagation()}
+      className="underline decoration-dotted underline-offset-2 transition-colors hover:text-accent"
+      title={`Email ${sender}`}
+    >
+      {senderName(sender)}
+    </a>
+  );
 }
 
 // Parse the START time of a calendar event into a Date on `base`'s day.
@@ -62,10 +99,22 @@ function parseEventStart(timeStr, base) {
   return d;
 }
 
+// True when a tap landed on an interactive child (checkbox, link, button) —
+// the card-level toggle must not double-fire for those.
+function tappedInteractive(e) {
+  return Boolean(e.target.closest('input, a, button'));
+}
+
+// The whole card is the tap target for completing an item (the 18px checkbox
+// alone is too small a target on the phone). The checkbox stays as the visual
+// + keyboard/AT affordance.
 function ActionItem({ item, onToggle }) {
   return (
     <div
-      className={`mb-1.5 flex items-start gap-2.5 rounded-xl border border-line p-3 transition-all ${
+      onClick={(e) => {
+        if (!tappedInteractive(e)) onToggle(item.id);
+      }}
+      className={`mb-1.5 flex cursor-pointer items-start gap-2.5 rounded-xl border border-line p-3 transition-all active:scale-[0.99] ${
         item.completed ? 'bg-completed opacity-50' : 'bg-surface'
       }`}
     >
@@ -79,7 +128,7 @@ function ActionItem({ item, onToggle }) {
         <p className={`m-0 text-sm text-ink ${item.completed ? 'line-through' : ''}`}>{item.description}</p>
         <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
           <Badge type={item.priority}>{item.priorityLabel}</Badge>
-          {item.sender && <span>{item.sender}</span>}
+          {item.sender && <SenderLink sender={item.sender} />}
           {item.age && <span>· {item.age}</span>}
           {item.note && <span>· {item.note}</span>}
         </p>
@@ -88,12 +137,13 @@ function ActionItem({ item, onToggle }) {
   );
 }
 
-// A user-added action item: checkbox to complete, swipe-left (or hover ✕) to
-// dismiss, and a small "manual" indicator.
+// A user-added action item: tap card/checkbox to complete, swipe-left (or
+// hover ✕) to dismiss, and a small "manual" indicator.
 function ManualActionItem({ item, onToggle, onDismiss }) {
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const startX = useRef(0);
+  const suppressTap = useRef(false); // a swipe must not also fire the tap-to-toggle
 
   const onTouchStart = (e) => {
     startX.current = e.touches[0].clientX;
@@ -101,7 +151,9 @@ function ManualActionItem({ item, onToggle, onDismiss }) {
   };
   const onTouchMove = (e) => {
     if (!dragging) return;
-    setDx(Math.min(0, e.touches[0].clientX - startX.current)); // dismiss is left-only
+    const d = Math.min(0, e.touches[0].clientX - startX.current); // dismiss is left-only
+    if (Math.abs(d) > 5) suppressTap.current = true;
+    setDx(d);
   };
   const onTouchEnd = () => {
     setDragging(false);
@@ -111,6 +163,9 @@ function ManualActionItem({ item, onToggle, onDismiss }) {
     } else {
       setDx(0);
     }
+    setTimeout(() => {
+      suppressTap.current = false;
+    }, 350);
   };
 
   return (
@@ -125,7 +180,11 @@ function ManualActionItem({ item, onToggle, onDismiss }) {
       </div>
 
       <div
-        className={`group flex items-start gap-2.5 rounded-xl border border-line p-3 ${
+        onClick={(e) => {
+          if (suppressTap.current || tappedInteractive(e)) return;
+          onToggle(item.id);
+        }}
+        className={`group flex cursor-pointer items-start gap-2.5 rounded-xl border border-line p-3 active:scale-[0.99] ${
           item.completed ? 'bg-completed opacity-50' : 'bg-surface'
         }`}
         style={{
@@ -303,7 +362,13 @@ function SwipeableFyi({ item, onDismiss, onPromote }) {
       >
         <p className="m-0 pr-14 text-[13px] text-ink">{item.description}</p>
         <p className="mt-1 text-[11px] text-muted">
-          <Badge type="fyi">{item.priorityLabel}</Badge> {item.sender && <span> · {item.sender}</span>}{' '}
+          <Badge type="fyi">{item.priorityLabel}</Badge>{' '}
+          {item.sender && (
+            <span>
+              {' '}
+              · <SenderLink sender={item.sender} />
+            </span>
+          )}{' '}
           {item.age && <span> · {item.age}</span>}
         </p>
 
@@ -332,16 +397,19 @@ function SwipeableFyi({ item, onDismiss, onPromote }) {
   );
 }
 
+// Slim one-row "next meeting" card — replaces the old Section + tall card so
+// action items start higher on the screen.
 function NextUpCard({ event }) {
   return (
     <div
-      className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4"
+      className="mb-4 flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-2.5"
       style={event.highlight ? { borderLeft: '3px solid var(--highlight)' } : undefined}
     >
-      <div className="min-w-[100px] whitespace-nowrap text-[13px] font-medium text-accent">{event.time}</div>
-      <div>
-        <div className="text-sm font-medium text-ink">{event.title}</div>
-        <div className="text-xs text-muted">{event.location}</div>
+      <Icon name="calendar" size={15} strokeWidth={1.9} className="shrink-0 text-accent" />
+      <span className="shrink-0 whitespace-nowrap text-[13px] font-medium text-accent">{event.time}</span>
+      <div className="min-w-0">
+        <div className="truncate text-[13px] font-medium text-ink">{event.title}</div>
+        <div className="truncate text-[11px] text-muted">{event.location}</div>
       </div>
     </div>
   );
@@ -360,11 +428,33 @@ function Section({ icon, title, badge, children }) {
   );
 }
 
-function StatCard({ num, label }) {
+// Loading skeleton: header line + three pulsing item cards.
+function Skeleton() {
   return (
-    <div className="rounded-xl border border-line bg-surface px-4 py-3.5 text-center">
-      <div className="text-2xl font-medium text-ink">{num}</div>
-      <div className="mt-0.5 text-xs text-muted">{label}</div>
+    <div className="animate-pulse" aria-label="Loading briefing">
+      <div className="mb-5 h-5 w-2/3 rounded-md bg-subtle" />
+      <div className="mb-4 h-12 rounded-xl border border-line bg-subtle" />
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="mb-1.5 h-[72px] rounded-xl border border-line bg-surface p-3">
+          <div className="mb-2 h-3.5 w-5/6 rounded bg-subtle" />
+          <div className="h-3 w-1/2 rounded bg-subtle" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Bottom toast with a 5s Undo window (for swipe-dismissals).
+function UndoToast({ toast, onUndo }) {
+  if (!toast) return null;
+  return (
+    <div className="fixed inset-x-0 bottom-5 z-50 px-4">
+      <div className="mx-auto flex max-w-content items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3 shadow-lg">
+        <span className="min-w-0 truncate text-[13px] text-ink">{toast.label}</span>
+        <button onClick={onUndo} className="shrink-0 text-[13px] font-semibold text-accent">
+          Undo
+        </button>
+      </div>
     </div>
   );
 }
@@ -398,10 +488,24 @@ function saveManual(items) {
     localStorage.setItem('manual-items', JSON.stringify(items));
   } catch (e) {}
 }
+function loadFlag(key) {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem(key) === '1';
+  } catch (e) {
+    return false;
+  }
+}
+function saveFlag(key) {
+  try {
+    localStorage.setItem(key, '1');
+  } catch (e) {}
+}
 
 export default function Briefing() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [lastRefresh, setLastRefresh] = useState(null);
 
@@ -410,21 +514,61 @@ export default function Briefing() {
   const [promotedIds, setPromotedIds] = useState(() => loadIdSet('fyi-promoted'));
   // User-added action items (persisted; roll over across briefings).
   const [manualItems, setManualItems] = useState(() => loadManual());
+  // The swipe hint disappears once the gesture has been used successfully.
+  const [hintDone, setHintDone] = useState(() => loadFlag('swipe-hint-done'));
 
-  const dismissFyi = useCallback((id) => {
-    setDismissedIds((prev) => {
-      const next = new Set(prev).add(id);
-      saveIdSet('fyi-dismissed', next);
-      return next;
+  // Undo toast for destructive swipes. { label, undo } — undo restores state.
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef(null);
+  const showToast = useCallback((label, undo) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ label, undo });
+    toastTimer.current = setTimeout(() => setToast(null), 5000);
+  }, []);
+  const runUndo = useCallback(() => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast((t) => {
+      if (t) t.undo();
+      return null;
     });
   }, []);
-  const promoteFyi = useCallback((id) => {
-    setPromotedIds((prev) => {
-      const next = new Set(prev).add(id);
-      saveIdSet('fyi-promoted', next);
-      return next;
-    });
+  useEffect(() => () => toastTimer.current && clearTimeout(toastTimer.current), []);
+
+  const markHintDone = useCallback(() => {
+    setHintDone(true);
+    saveFlag('swipe-hint-done');
   }, []);
+
+  const dismissFyi = useCallback(
+    (id) => {
+      markHintDone();
+      setDismissedIds((prev) => {
+        const next = new Set(prev).add(id);
+        saveIdSet('fyi-dismissed', next);
+        return next;
+      });
+      showToast('FYI dismissed', () =>
+        setDismissedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          saveIdSet('fyi-dismissed', next);
+          return next;
+        })
+      );
+    },
+    [markHintDone, showToast]
+  );
+  const promoteFyi = useCallback(
+    (id) => {
+      markHintDone();
+      setPromotedIds((prev) => {
+        const next = new Set(prev).add(id);
+        saveIdSet('fyi-promoted', next);
+        return next;
+      });
+    },
+    [markHintDone]
+  );
 
   const addManual = useCallback((description, priority) => {
     setManualItems((prev) => {
@@ -452,15 +596,32 @@ export default function Briefing() {
       return next;
     });
   }, []);
-  const dismissManual = useCallback((id) => {
-    setManualItems((prev) => {
-      const next = prev.filter((i) => i.id !== id);
-      saveManual(next);
-      return next;
-    });
-  }, []);
+  const dismissManual = useCallback(
+    (id) => {
+      let removed = null;
+      let removedIndex = -1;
+      setManualItems((prev) => {
+        removedIndex = prev.findIndex((i) => i.id === id);
+        removed = removedIndex >= 0 ? prev[removedIndex] : null;
+        const next = prev.filter((i) => i.id !== id);
+        saveManual(next);
+        return next;
+      });
+      showToast('Item removed', () =>
+        setManualItems((prev) => {
+          if (!removed) return prev;
+          const next = [...prev];
+          next.splice(Math.min(removedIndex, next.length), 0, removed);
+          saveManual(next);
+          return next;
+        })
+      );
+    },
+    [showToast]
+  );
 
   const fetchBriefing = useCallback(async () => {
+    setRefreshing(true);
     try {
       const res = await fetch('/api/briefing');
       if (!res.ok) throw new Error('Failed to load briefing');
@@ -472,12 +633,33 @@ export default function Briefing() {
       setError(e.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     fetchBriefing();
   }, [fetchBriefing]);
+
+  // Pull-to-refresh: drag down from the top of the page, release past the
+  // threshold to refetch. globals.css sets overscroll-behavior-y so the
+  // browser's native pull-to-refresh doesn't fight this.
+  const [pull, setPull] = useState(0);
+  const pullStart = useRef(null);
+  const onPullStart = (e) => {
+    pullStart.current = window.scrollY <= 0 ? e.touches[0].clientY : null;
+  };
+  const onPullMove = (e) => {
+    if (pullStart.current === null || refreshing) return;
+    const dy = e.touches[0].clientY - pullStart.current;
+    if (dy > 0 && window.scrollY <= 0) setPull(Math.min(dy * 0.45, 90));
+    else setPull(0);
+  };
+  const onPullEnd = () => {
+    if (pull >= PULL_TRIGGER && !refreshing) fetchBriefing();
+    pullStart.current = null;
+    setPull(0);
+  };
 
   const toggleItem = async (id) => {
     setData((prev) => ({
@@ -493,23 +675,34 @@ export default function Briefing() {
     } catch (e) {}
   };
 
-  if (loading)
+  if (loading) return <Skeleton />;
+
+  // Network failure and "no briefing yet" are different situations — say which.
+  if (error)
     return (
       <div className="py-16 text-center">
-        <div className="text-lg text-muted">Loading briefing...</div>
+        <div className="text-lg text-highlight">Couldn&rsquo;t load the briefing</div>
+        <p className="mt-2 text-sm text-muted">Check your connection and try again.</p>
+        <button
+          onClick={fetchBriefing}
+          disabled={refreshing}
+          className="mt-4 rounded-lg border border-accent bg-surface px-6 py-2.5 text-sm text-accent disabled:opacity-50"
+        >
+          {refreshing ? 'Retrying…' : 'Retry'}
+        </button>
       </div>
     );
-
-  if (error || !data)
+  if (!data)
     return (
       <div className="py-16 text-center">
-        <div className="text-lg text-highlight">No briefing available yet</div>
+        <div className="text-lg text-heading">No briefing available yet</div>
         <p className="mt-2 text-sm text-muted">The first briefing will appear after the scheduled task runs.</p>
         <button
           onClick={fetchBriefing}
-          className="mt-4 rounded-lg border border-accent bg-surface px-6 py-2.5 text-sm text-accent"
+          disabled={refreshing}
+          className="mt-4 rounded-lg border border-accent bg-surface px-6 py-2.5 text-sm text-accent disabled:opacity-50"
         >
-          Retry
+          {refreshing ? 'Checking…' : 'Check again'}
         </button>
       </div>
     );
@@ -520,7 +713,9 @@ export default function Briefing() {
   const promotedFromFyi = allItems
     .filter((i) => i.type === 'fyi' && promotedIds.has(i.id))
     .map((i) => ({ ...i, type: 'action', priority: 'today', priorityLabel: 'TODAY' }));
-  const actionItems = [...rawActions, ...promotedFromFyi, ...manualItems];
+  // Triage order: urgent → today → week (stable within each tier), regardless
+  // of whether an item came from the pipeline, a promotion, or was added by hand.
+  const actionItems = [...rawActions, ...promotedFromFyi, ...manualItems].sort((a, b) => rank(a) - rank(b));
   const fyi = allItems.filter((i) => i.type === 'fyi' && !dismissedIds.has(i.id) && !promotedIds.has(i.id));
   const completed = actionItems.filter((i) => i.completed).length;
   const pending = actionItems.filter((i) => !i.completed).length;
@@ -530,7 +725,6 @@ export default function Briefing() {
   const calendar = data.calendar || [];
   const now = new Date();
   let nextEvent = null;
-  let noMoreToday = false;
   if (calendar.length > 0) {
     if (data.briefingType === 'afternoon') {
       nextEvent = calendar[0];
@@ -539,7 +733,6 @@ export default function Briefing() {
         const t = parseEventStart(e.time, now);
         return t && t.getTime() >= now.getTime();
       }) || null;
-      noMoreToday = !nextEvent;
     }
   }
 
@@ -551,31 +744,30 @@ export default function Briefing() {
     );
 
   return (
-    <div>
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="m-0 text-[22px] font-medium text-heading">Daily briefing</h1>
-        <div className="text-right">
-          <div className="text-[13px] text-muted">{data.date}</div>
-          <div className="text-[11px] text-muted">{data.briefingType} briefing</div>
+    <div onTouchStart={onPullStart} onTouchMove={onPullMove} onTouchEnd={onPullEnd}>
+      {/* Pull-to-refresh indicator (height follows the drag) */}
+      <div
+        className="flex items-end justify-center overflow-hidden text-[12px] text-muted"
+        style={{ height: refreshing ? 32 : pull, transition: pullStart.current ? 'none' : 'height 0.18s ease-out' }}
+      >
+        <span className="pb-2">
+          {refreshing ? 'Refreshing…' : pull >= PULL_TRIGGER ? 'Release to refresh' : 'Pull to refresh'}
+        </span>
+      </div>
+
+      {/* Compact status line: date · type on the left, counts on the right. */}
+      <div className="mb-4 flex items-baseline justify-between gap-2">
+        <h1 className="m-0 text-[17px] font-semibold text-heading">
+          {shortDate(data.date)}
+          <span className="font-normal text-muted"> · {data.briefingType}</span>
+        </h1>
+        <div className="shrink-0 text-[13px] text-muted">
+          <span className="font-semibold text-ink">{pending}</span> to do
+          {completed > 0 && <span> · {completed} done</span>}
         </div>
       </div>
 
-      {(nextEvent || noMoreToday) && (
-        <Section icon="calendar" title="Next up">
-          {nextEvent ? (
-            <NextUpCard event={nextEvent} />
-          ) : (
-            <div className="rounded-xl border border-line bg-surface p-4 text-center text-[13px] text-muted">
-              No more meetings today.
-            </div>
-          )}
-        </Section>
-      )}
-
-      <div className="mb-6 grid grid-cols-2 gap-2.5">
-        <StatCard num={pending} label="To do" />
-        <StatCard num={completed} label="Done" />
-      </div>
+      {nextEvent && <NextUpCard event={nextEvent} />}
 
       <Section icon="inbox" title="Action items" badge={<Badge type="urgent">{pending} pending</Badge>}>
         {actionItems.filter((i) => !i.completed).map(renderActionRow)}
@@ -600,19 +792,24 @@ export default function Briefing() {
           {fyi.map((i) => (
             <SwipeableFyi key={i.id} item={i} onDismiss={dismissFyi} onPromote={promoteFyi} />
           ))}
-          <p className="mt-2 text-center text-[11px] text-muted">Swipe left to dismiss · right to promote</p>
+          {!hintDone && (
+            <p className="mt-2 text-center text-[11px] text-muted">Swipe left to dismiss · right to promote</p>
+          )}
         </Section>
       )}
 
       <div className="border-t border-line py-5 text-center">
         <button
           onClick={fetchBriefing}
-          className="rounded-lg border border-accent bg-surface px-6 py-2.5 text-[13px] text-accent"
+          disabled={refreshing}
+          className="rounded-lg border border-accent bg-surface px-6 py-2.5 text-[13px] text-accent disabled:opacity-60"
         >
-          Refresh
+          {refreshing ? 'Refreshing…' : 'Refresh'}
         </button>
         {lastRefresh && <p className="mt-2 text-[11px] text-muted">Last updated {lastRefresh.toLocaleTimeString()}</p>}
       </div>
+
+      <UndoToast toast={toast} onUndo={runUndo} />
     </div>
   );
 }
