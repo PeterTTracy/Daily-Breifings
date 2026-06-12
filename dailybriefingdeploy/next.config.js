@@ -16,10 +16,6 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
-  // pdf-parse pulls in pdfjs-dist, which loads its worker from its own package
-  // dir at runtime. Bundling it breaks that resolution ("fake worker failed"),
-  // so keep it external and required from node_modules instead.
-  serverExternalPackages: ['pdf-parse'],
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

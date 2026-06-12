@@ -270,6 +270,7 @@ export default function CateringPanel() {
           {/* Notes / attribution */}
           <div className="mt-3 space-y-1 border-t border-line pt-2.5 text-[10px] leading-snug text-subtletext">
             {isSample && <p className="text-muted">Sample data — upload the weekly Invoice Report PDF to replace.</p>}
+            {!isSample && view?.warning && <p className="text-highlight">{view.warning}</p>}
             {stale && <p className="text-muted">Data may be stale — last upload over two weeks ago.</p>}
             {err && <p className="text-highlight">Upload failed: {err}</p>}
             {uploading && <p className="text-muted">Parsing PDF…</p>}

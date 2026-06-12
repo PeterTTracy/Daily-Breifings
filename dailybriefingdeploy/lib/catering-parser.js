@@ -1,28 +1,33 @@
 // Parser for Pete's weekly CaterTrax "Invoice Report" PDF
 // (shopa_print_all_invoices.asp). The export bundles every catering event for a
 // week, each as a 1-2 page invoice. We:
-//   1. extract the full text with pdf-parse,
+//   1. extract a newline-structured text layer with unpdf (see extractText),
 //   2. split it into per-invoice chunks on the "Invoice #" marker (one per event),
 //   3. pull labeled fields out of each chunk with tolerant regexes,
 //   4. group the events by day and roll up the weekly totals.
 //
 // The field labels in CaterTrax PDFs are reasonably stable ("Event Date:",
 // "Guest Count:", "Balance Due:", …) but spacing/line-wrapping from the PDF text
-// layer is not, so every extractor collapses whitespace first and accepts a few
-// label variants. Missing fields degrade to null/0 rather than throwing — one
-// malformed invoice shouldn't sink the whole report.
+// layer is not, so every extractor collapses whitespace first, accepts a few
+// label variants, and tolerates the value landing on the next line. Missing
+// fields degrade to null/0 rather than throwing — one malformed invoice
+// shouldn't sink the whole report, and a report we can't make sense of returns
+// an empty (but valid) result with a warning instead of erroring.
+//
+// We use unpdf rather than pdf-parse because pdf-parse drags in pdfjs's worker,
+// which fails to resolve in bundled/serverless runtimes (Vercel) and crashes the
+// function with an empty response. unpdf ships a worker-free pdfjs build that
+// runs in-process, so there's nothing to mis-bundle.
 //
 // Output shape (everything the Catering panel needs):
 //   { source, startDate, endDate, dateRangeLabel, weekRevenue, totalEvents,
-//     totalGuests,
+//     totalGuests, warning?,
 //     events:[{ orderName, invoiceNumber, eventDate, dateISO, dayOfWeek,
 //               status, building, room, guestCount, startTime, endTime,
 //               deliveryTime, customerName, department, balanceDue, special }],
 //     days:[{ dateISO, dayLabel, dateLabel, events:[…], revenue, guests }] }
 
-// pdf-parse v2 exposes a PDFParse class: construct with the file bytes, call
-// getText() for the extracted text layer, then destroy() to free the worker.
-import { PDFParse } from 'pdf-parse';
+import { getDocumentProxy } from 'unpdf';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -187,13 +192,12 @@ function parseInvoice(fieldText, title) {
 // fields strictly after the marker means one event's footer (special
 // instructions, balance) can never bleed into the next event's title region.
 function splitInvoices(fullText) {
-  const marker = /Invoice\s*#?\s*:?\s*#?\d{3,7}/gi;
-  const lineStarts = [];
-  let m;
-  while ((m = marker.exec(fullText)) !== null) {
-    const nl = fullText.lastIndexOf('\n', m.index);
-    lineStarts.push(nl === -1 ? 0 : nl + 1);
-  }
+  // Primary: the "Invoice #NNNNN" label. Fallback: a bare "#NNNNN" token, in
+  // case the real export prints the number without the word "Invoice" next to
+  // it (different text-layer ordering). Whichever finds more markers wins.
+  const byLabel = markerStarts(fullText, /Invoice\s*#?\s*:?\s*#?\d{3,7}/gi);
+  const byHash = markerStarts(fullText, /(?:^|\s)#\s?\d{4,6}\b/g);
+  const lineStarts = byHash.length > byLabel.length ? byHash : byLabel;
   if (!lineStarts.length) return [];
 
   return lineStarts.map((start, i) => {
@@ -204,6 +208,20 @@ function splitInvoices(fullText) {
       title: extractTitle(fullText.slice(titleFloor, start)),
     };
   });
+}
+
+// Collect the line-start offset for every match of `re`, de-duplicated (a
+// fallback pattern can match the same line twice).
+function markerStarts(fullText, re) {
+  const starts = [];
+  let m;
+  while ((m = re.exec(fullText)) !== null) {
+    const idx = m.index + (m[0].length - m[0].trimStart().length); // skip leading ws the pattern ate
+    const nl = fullText.lastIndexOf('\n', idx);
+    const start = nl === -1 ? 0 : nl + 1;
+    if (starts[starts.length - 1] !== start) starts.push(start);
+  }
+  return starts;
 }
 
 // ---------------------------------------------------------------------------
@@ -229,30 +247,50 @@ function deriveRange(fullText, events) {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-export async function parseCatering(input, filename = 'invoices.pdf') {
-  const buffer = Buffer.isBuffer(input) ? input : Buffer.from(input);
-  const parser = new PDFParse({ data: new Uint8Array(buffer) });
-  let text;
+// Extract a newline-structured text layer with unpdf's worker-free pdfjs.
+// unpdf's own extractText() joins items with spaces and loses line structure,
+// which the invoice splitter depends on — so we walk the text items ourselves
+// and insert a line break whenever an item flags hasEOL or its baseline y jumps.
+async function extractText(buffer) {
+  const doc = await getDocumentProxy(new Uint8Array(buffer));
+  const lines = [];
+  let totalPages = 0;
   try {
-    ({ text } = await parser.getText());
+    totalPages = doc.numPages;
+    for (let p = 1; p <= totalPages; p++) {
+      const page = await doc.getPage(p);
+      const content = await page.getTextContent();
+      let line = '';
+      let lastY = null;
+      for (const it of content.items) {
+        if (typeof it?.str !== 'string') continue;
+        const y = Array.isArray(it.transform) ? it.transform[5] : null;
+        if (lastY !== null && y !== null && Math.abs(y - lastY) > 2) {
+          lines.push(line);
+          line = '';
+        }
+        line += it.str;
+        if (it.hasEOL) {
+          lines.push(line);
+          line = '';
+          lastY = null;
+        } else {
+          lastY = y;
+        }
+      }
+      if (line) lines.push(line);
+      lines.push(''); // page break
+    }
   } finally {
-    await parser.destroy();
+    // Free pdfjs internals; ignore if the build doesn't expose destroy().
+    try { await doc.destroy?.(); } catch {}
   }
-  if (!text || !text.trim()) {
-    throw new Error('No text found in the PDF. Is this the CaterTrax Invoice Report export?');
-  }
+  return { text: lines.join('\n'), totalPages };
+}
 
-  const chunks = splitInvoices(text);
-  if (!chunks.length) {
-    throw new Error('No invoices found (expected "Invoice #" markers). Is this the CaterTrax Invoice Report export?');
-  }
-
-  const events = chunks
-    .map((c) => parseInvoice(c.fieldText, c.title))
-    // Keep only chunks that produced a usable event (a date or a balance).
-    .filter((e) => e.dateISO || e.balanceDue > 0 || e.invoiceNumber);
-
-  const { startDate, endDate } = deriveRange(text, events);
+// Assemble the final result object from a (possibly empty) list of events.
+function buildResult(filename, fullText, totalPages, events, warning) {
+  const { startDate, endDate } = deriveRange(fullText, events);
 
   // Group by day, chronologically.
   const byIso = new Map();
@@ -277,20 +315,67 @@ export async function parseCatering(input, filename = 'invoices.pdf') {
       };
     });
 
-  const weekRevenue = events.reduce((s, e) => s + e.balanceDue, 0);
-  const totalGuests = events.reduce((s, e) => s + e.guestCount, 0);
-  const dateRangeLabel =
-    startDate && endDate ? `${isoToShort(startDate)} – ${isoToShort(endDate)}` : '';
+  const dateRangeLabel = startDate && endDate ? `${isoToShort(startDate)} – ${isoToShort(endDate)}` : '';
 
-  return {
+  const result = {
     source: filename,
     startDate,
     endDate,
     dateRangeLabel,
-    weekRevenue,
+    weekRevenue: events.reduce((s, e) => s + e.balanceDue, 0),
     totalEvents: events.length,
-    totalGuests,
+    totalGuests: events.reduce((s, e) => s + e.guestCount, 0),
     events,
     days,
   };
+  if (warning) {
+    result.warning = warning;
+    // A short text sample makes a non-parsing export diagnosable from the UI.
+    result.sampleText = collapse(fullText).slice(0, 600);
+    result.totalPages = totalPages;
+  }
+  return result;
 }
+
+export async function parseCatering(input, filename = 'invoices.pdf') {
+  const buffer = Buffer.isBuffer(input) ? input : Buffer.from(input);
+
+  let text = '';
+  let totalPages = 0;
+  try {
+    ({ text, totalPages } = await extractText(buffer));
+  } catch (e) {
+    // Extraction itself failed (corrupt/encrypted/non-PDF). Surface a clear,
+    // valid result rather than letting the route 500 with an opaque message.
+    return buildResult(filename, '', 0, [], `Could not read the PDF: ${e.message || 'unknown error'}`);
+  }
+
+  if (!text.trim()) {
+    return buildResult(
+      filename,
+      '',
+      totalPages,
+      [],
+      'No selectable text in the PDF — it may be scanned/flattened images rather than a text export.'
+    );
+  }
+
+  const chunks = splitInvoices(text);
+  const events = chunks
+    .map((c) => parseInvoice(c.fieldText, c.title))
+    // Keep only chunks that produced a usable event (a date or a balance).
+    .filter((e) => e.dateISO || e.balanceDue > 0 || e.invoiceNumber);
+
+  if (!events.length) {
+    return buildResult(
+      filename,
+      text,
+      totalPages,
+      [],
+      'Read the PDF but found no recognizable invoices. The export layout may differ from what the parser expects.'
+    );
+  }
+
+  return buildResult(filename, text, totalPages, events);
+}
+

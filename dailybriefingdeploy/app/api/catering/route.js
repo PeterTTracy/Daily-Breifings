@@ -54,12 +54,18 @@ export async function POST(req) {
     const uploadedAt = Date.now();
     parsed.uploadedAt = uploadedAt;
 
+    // parseCatering never throws for "couldn't make sense of it" — it returns a
+    // valid result carrying a `warning` and zero events. Don't let such a parse
+    // overwrite a previously-good upload; just hand it back so the panel can
+    // explain what happened.
+    const ok = parsed.totalEvents > 0;
+
     const store = await getStore();
     if (!store) {
       // No KV configured (local dev without env vars): return the parse so the
       // client can show it this session, but it won't persist.
       return NextResponse.json({
-        ok: true,
+        ok,
         current: parsed,
         previous: null,
         uploadedAt,
@@ -67,11 +73,17 @@ export async function POST(req) {
       });
     }
 
+    if (!ok) {
+      // Keep the existing stored week intact; surface the new (empty) parse only.
+      const existing = await store.get(STORE_KEY);
+      return NextResponse.json({ ok, current: parsed, previous: existing?.current || null, uploadedAt });
+    }
+
     const existing = await store.get(STORE_KEY);
     const previous = existing?.current || null;
     const record = { current: parsed, previous, uploadedAt };
     await store.set(STORE_KEY, record);
-    return NextResponse.json({ ok: true, ...record });
+    return NextResponse.json({ ok, ...record });
   } catch (e) {
     return NextResponse.json({ error: e.message || 'Failed to parse upload' }, { status: 500 });
   }
