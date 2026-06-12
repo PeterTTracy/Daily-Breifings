@@ -829,13 +829,13 @@ const DESKTOP_MQ = '(min-width: 1280px)';
 
 // Mobile carousel frames, in left→right reading order for the tab strip. `i` is
 // the panel's position in the swipe track (see Dashboard): the track is laid out
-// [Catering(0), Briefing(1), Financials(2)] so that a finger-following swipe
-// LEFT lands on Financials (the desktop left pane) and a swipe RIGHT lands on
-// Catering (the desktop right pane) — the mapping Pete asked for.
+// [Financials(0), Briefing(1), Catering(2)] — matching the desktop left→right
+// order — so a finger-following swipe LEFT lands on Catering (the right pane)
+// and a swipe RIGHT lands on Financials (the left pane), like a normal carousel.
 const FRAMES = [
-  { i: 2, label: 'Financials' },
+  { i: 0, label: 'Financials' },
   { i: 1, label: 'Briefing' },
-  { i: 0, label: 'Catering' },
+  { i: 2, label: 'Catering' },
 ];
 const CENTER = 1; // Briefing is the default frame on mobile.
 
@@ -888,11 +888,11 @@ function FrameTabs({ index, onSelect }) {
 // Three-pane dashboard.
 //   xl+  : left (260) · center briefing (680) · right (260), side by side.
 //   < xl : a horizontal carousel of three full-width frames. Center (Briefing)
-//          is the default; swipe left for the left pane (Financials/TechCash),
-//          right for the right pane (Catering). The track DOM order is
-//          [Catering, Briefing, Financials] so a natural finger-following drag
-//          maps to that gesture; `order-*` utilities re-sequence the flex items
-//          back into left/center/right on desktop.
+//          is the default; swipe left to reveal the right pane (Catering) and
+//          swipe right to reveal the left pane (Financials/TechCash), like a
+//          normal carousel. The track DOM order [Financials, Briefing, Catering]
+//          already matches the desktop left→right order, so a finger-following
+//          drag maps to that gesture with no re-sequencing needed.
 export default function Dashboard() {
   const isDesktop = useIsDesktop();
   const [mounted, setMounted] = useState(false);
@@ -963,24 +963,24 @@ export default function Dashboard() {
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
         >
-          {/* Frame 0 — right pane (Catering); desktop far right. */}
-          <div className="w-full shrink-0 xl:order-3 xl:w-[260px]">
-            <CateringPanel />
+          {/* Frame 0 — left pane (Financials + TechCash); desktop far left. */}
+          <div className="w-full shrink-0 xl:w-[260px]">
+            <div className="space-y-4">
+              <FinancialsPanel />
+              <MealClicksPanel />
+            </div>
           </div>
 
           {/* Frame 1 — center briefing; desktop middle, at its 680px width. */}
-          <div className="w-full shrink-0 xl:order-2 xl:w-auto xl:flex-1">
+          <div className="w-full shrink-0 xl:w-auto xl:flex-1">
             <div className="mx-auto w-full max-w-content">
               <BriefingColumn />
             </div>
           </div>
 
-          {/* Frame 2 — left pane (Financials + TechCash); desktop far left. */}
-          <div className="w-full shrink-0 xl:order-1 xl:w-[260px]">
-            <div className="space-y-4">
-              <FinancialsPanel />
-              <MealClicksPanel />
-            </div>
+          {/* Frame 2 — right pane (Catering); desktop far right. */}
+          <div className="w-full shrink-0 xl:w-[260px]">
+            <CateringPanel />
           </div>
         </div>
       </div>
