@@ -419,7 +419,10 @@ export async function parseCatering(input, filename = 'invoices.pdf') {
 function eventsFromText(text) {
   return splitInvoices(text)
     .map((c) => parseInvoice(c.fieldText, c.title))
-    .filter((e) => e.dateISO || e.orderTotal > 0 || e.balanceDue > 0 || e.invoiceNumber);
+    // Must look like a real invoice (date / total / #) AND have guests. A 0-guest
+    // order is an unconfirmed/pending draft in CaterTrax — keep it off the board.
+    .filter((e) => e.dateISO || e.orderTotal > 0 || e.balanceDue > 0 || e.invoiceNumber)
+    .filter((e) => Number(e.guestCount) > 0);
 }
 
 // ---------------------------------------------------------------------------

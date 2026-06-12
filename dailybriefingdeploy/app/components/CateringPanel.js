@@ -213,14 +213,15 @@ export default function CateringPanel() {
 
   // Flatten the day groups into one chronological list — each card now carries
   // its own date, so the per-day headers are redundant. `days` is already
-  // date-sorted, and events within a day keep their report order.
+  // date-sorted, and events within a day keep their report order. Drop 0-guest
+  // orders (unconfirmed/pending drafts) here too so data stored before the
+  // parser filter landed is cleaned up without needing a re-upload — and derive
+  // the totals from the filtered list so the header always matches what's shown.
   const days = (view?.days || []).filter((d) => d.events?.length > 0);
-  const events = days.flatMap((d) => d.events || []);
-  const weekRevenue =
-    view?.weekRevenue != null ? view.weekRevenue : events.reduce((s, e) => s + eventTotal(e), 0);
-  const totalEvents = view?.totalEvents != null ? view.totalEvents : events.length;
-  const totalGuests =
-    view?.totalGuests != null ? view.totalGuests : events.reduce((s, e) => s + Number(e.guestCount || 0), 0);
+  const events = days.flatMap((d) => d.events || []).filter((e) => Number(e.guestCount || 0) > 0);
+  const weekRevenue = events.reduce((s, e) => s + eventTotal(e), 0);
+  const totalEvents = events.length;
+  const totalGuests = events.reduce((s, e) => s + Number(e.guestCount || 0), 0);
 
   return (
     <SidePanel icon="utensils" title="Catering Events" action={uploadAction}>
