@@ -52,7 +52,7 @@ export default async function RootLayout({ children }) {
       </head>
       <body className="min-h-screen bg-pagebg text-ink">
         <header className="sticky top-0 z-40 border-b border-line bg-pagebg/85 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-content items-center justify-between px-4 py-2.5">
+          <div className="mx-auto flex w-full max-w-dashboard items-center justify-between px-4 py-2.5">
             <div className="flex items-center gap-2">
               <span className="h-3.5 w-3.5 rounded-[3px] bg-accent" aria-hidden="true" />
               <span className="text-[13px] font-semibold tracking-tight text-ink">Daily Briefing</span>
@@ -63,7 +63,7 @@ export default async function RootLayout({ children }) {
             </div>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-content px-4 pb-10 pt-5">{children}</main>
+        <main className="mx-auto w-full max-w-dashboard px-4 pb-10 pt-5">{children}</main>
         <InstallPrompt />
       </body>
     </html>

@@ -28,6 +28,8 @@ module.exports = {
       },
       maxWidth: {
         content: '680px',
+        // Three-pane dashboard: left 260 + center 680 + right 260 + 2×20 gaps.
+        dashboard: '1240px',
       },
     },
   },

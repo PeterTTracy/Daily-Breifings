@@ -1,6 +1,9 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Icon from './components/Icon';
+import FinancialsPanel from './components/FinancialsPanel';
+import MealClicksPanel from './components/MealClicksPanel';
+import CateringPanel from './components/CateringPanel';
 
 // Badge palettes keep the exact original colors, with explicit dark: variants
 // since these are accent chips (not the CSS-variable-backed semantic surfaces).
@@ -502,7 +505,9 @@ function saveFlag(key) {
   } catch (e) {}
 }
 
-export default function Briefing() {
+// The center column — the daily briefing exactly as before. Wrapped by
+// Dashboard below; its own logic (fetch, swipe, pull-to-refresh) is unchanged.
+function BriefingColumn() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -810,6 +815,38 @@ export default function Briefing() {
       </div>
 
       <UndoToast toast={toast} onUndo={runUndo} />
+    </div>
+  );
+}
+
+// Three-pane dashboard wrapper.
+//   xl+   : left (260) · center briefing (680) · right (260), side by side.
+//   < xl  : briefing on top; the side panes stack below it (two columns on md,
+//           one on mobile), each collapsible via SidePanel.
+// DOM order is center-first so the briefing leads on narrow screens; on xl the
+// `order-*` utilities re-sequence the flex items into left/center/right.
+export default function Dashboard() {
+  return (
+    <div className="xl:flex xl:items-start xl:gap-5">
+      {/* Center — the briefing, kept at its 680px reading width and centered. */}
+      <div className="order-1 min-w-0 xl:order-2 xl:flex-1">
+        <div className="mx-auto w-full max-w-content">
+          <BriefingColumn />
+        </div>
+      </div>
+
+      {/* Side panes. `xl:contents` dissolves this wrapper into the flex row on
+          wide screens so left/right become direct flex items; below xl it's a
+          1-col (mobile) / 2-col (md) grid sitting under the briefing. */}
+      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:mt-0 xl:contents">
+        <aside className="space-y-4 xl:order-1 xl:w-[260px] xl:shrink-0">
+          <FinancialsPanel />
+          <MealClicksPanel />
+        </aside>
+        <aside className="xl:order-3 xl:w-[260px] xl:shrink-0">
+          <CateringPanel />
+        </aside>
+      </div>
     </div>
   );
 }
