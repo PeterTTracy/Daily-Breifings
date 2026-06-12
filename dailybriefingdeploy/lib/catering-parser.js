@@ -147,16 +147,26 @@ function parseInvoice(fieldText, title) {
     /#(\d{4,6})/,
   ]);
 
+  // The card's date line is the pick-up / delivery / event date — accept any of
+  // those labels, since CaterTrax may print a delivery or pickup date distinct
+  // from the event date.
+  const DATE_LABEL = '(?:Pick\\s*-?\\s*up|Pickup|Delivery|Drop\\s*-?\\s*off|Event|Requested|Service)\\s*Date';
   const rawDate = firstMatch(text, [
-    new RegExp(`Event\\s*Date\\s*:?\\s*((?:${WEEKDAYS.join('|')})?,?\\s*\\d{1,2}/\\d{1,2}/\\d{2,4})`, 'i'),
-    /Event\s*Date\s*:?\s*([^\n\r]+)/i,
+    new RegExp(`${DATE_LABEL}\\s*:?\\s*((?:${WEEKDAYS.join('|')})?,?\\s*\\d{1,2}/\\d{1,2}/\\d{2,4})`, 'i'),
+    new RegExp(`${DATE_LABEL}\\s*:?\\s*([^\\n\\r]+)`, 'i'),
     // last resort: any "Weekday, m/d/yyyy" anywhere in the chunk
     new RegExp(`((?:${WEEKDAYS.join('|')}),\\s*\\d{1,2}/\\d{1,2}/\\d{2,4})`, 'i'),
   ]);
   const date = parseEventDate(rawDate);
 
   const guestRaw = firstMatch(text, labeled('Guest\\s*Count', 'Guests', 'Guest\\s*#'));
-  const balanceRaw = firstMatch(text, labeled('Balance\\s*Due', 'Amount\\s*Due', 'Total\\s*Due'));
+  const balanceRaw = firstMatch(text, labeled('Balance\\s*Due', 'Amount\\s*Due'));
+  // Order Total is the value of the event (gross), which CaterTrax prints
+  // separately from Balance Due (what's still owed after payments). Pete wants
+  // the order total; fall back to the balance only if no total is labeled.
+  const totalRaw = firstMatch(text, labeled('Order\\s*Total', 'Invoice\\s*Total', 'Grand\\s*Total', 'Total\\s*Charges', 'Total\\s*Amount'));
+  const balanceDue = balanceRaw ? num(balanceRaw) : 0;
+  const orderTotal = totalRaw ? num(totalRaw) : balanceDue;
 
   const explicitName = firstMatch(text, labeled('Order\\s*Name'));
   const orderName =
@@ -178,7 +188,8 @@ function parseInvoice(fieldText, title) {
     deliveryTime: firstMatch(text, labeled('Food\\s*Delivery\\s*Time', 'Delivery\\s*Time')),
     customerName: firstMatch(text, labeled('Customer\\s*Name', 'Contact\\s*Name', 'Customer')),
     department: firstMatch(text, labeled('Department', 'Dept')),
-    balanceDue: balanceRaw ? num(balanceRaw) : 0,
+    balanceDue,
+    orderTotal,
     special: firstMatch(text, [/Special\s*Instructions\s*:?\s*([^\n\r]+)/i]),
   };
 }
@@ -335,7 +346,7 @@ function buildResult(filename, fullText, events, warning, diag = {}) {
         dayLabel,
         dateLabel,
         events: evs,
-        revenue: evs.reduce((s, e) => s + e.balanceDue, 0),
+        revenue: evs.reduce((s, e) => s + (e.orderTotal || 0), 0),
         guests: evs.reduce((s, e) => s + e.guestCount, 0),
       };
     });
@@ -347,7 +358,7 @@ function buildResult(filename, fullText, events, warning, diag = {}) {
     startDate,
     endDate,
     dateRangeLabel,
-    weekRevenue: events.reduce((s, e) => s + e.balanceDue, 0),
+    weekRevenue: events.reduce((s, e) => s + (e.orderTotal || 0), 0),
     totalEvents: events.length,
     totalGuests: events.reduce((s, e) => s + e.guestCount, 0),
     events,
@@ -408,7 +419,7 @@ export async function parseCatering(input, filename = 'invoices.pdf') {
 function eventsFromText(text) {
   return splitInvoices(text)
     .map((c) => parseInvoice(c.fieldText, c.title))
-    .filter((e) => e.dateISO || e.balanceDue > 0 || e.invoiceNumber);
+    .filter((e) => e.dateISO || e.orderTotal > 0 || e.balanceDue > 0 || e.invoiceNumber);
 }
 
 // ---------------------------------------------------------------------------
