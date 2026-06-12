@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { parseCatering } from '../../../lib/catering-parser';
+import { parseCatering, parseCateringHtml } from '../../../lib/catering-parser';
 
-// pdf-parse needs the Node runtime (Buffer + the pdfjs internals), and the
-// upload is request-driven, so never statically optimize this route.
+// pdfjs (unpdf) + cheerio need the Node runtime, and the upload is request-
+// driven, so never statically optimize this route.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +50,16 @@ export async function POST(req) {
     }
 
     const buf = Buffer.from(await file.arrayBuffer());
-    const parsed = await parseCatering(buf, file.name || 'invoices.pdf');
+    // Accept either the CaterTrax PDF or the saved report web page (HTML). The
+    // PDF export is image-only so it won't parse, but the HTML page has real
+    // text — detect by content signature, falling back to the filename.
+    const head = buf.subarray(0, 1024).toString('latin1').trimStart().toLowerCase();
+    const name = file.name || 'invoices';
+    const isPdf = head.startsWith('%pdf') || /\.pdf$/i.test(name);
+    const isHtml = head.startsWith('<!doctype') || head.startsWith('<html') || /<html|<table|<body/.test(head) || /\.(html?|mhtml)$/i.test(name);
+    const parsed = isPdf && !isHtml
+      ? await parseCatering(buf, name)
+      : parseCateringHtml(buf, name);
     const uploadedAt = Date.now();
     parsed.uploadedAt = uploadedAt;
 

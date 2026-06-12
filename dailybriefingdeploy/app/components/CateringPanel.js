@@ -206,13 +206,13 @@ export default function CateringPanel() {
 
   const uploadAction = (
     <>
-      <input ref={fileRef} type="file" accept=".pdf,application/pdf" onChange={onFile} className="hidden" />
+      <input ref={fileRef} type="file" accept=".html,.htm,.mhtml,text/html,.pdf,application/pdf" onChange={onFile} className="hidden" />
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
         disabled={uploading}
-        title="Upload CaterTrax Invoice Report PDF"
-        aria-label="Upload catering invoices PDF"
+        title="Upload the CaterTrax report saved as a web page (HTML)"
+        aria-label="Upload catering report HTML"
         className="rounded-md p-0.5 text-muted hover:text-accent disabled:opacity-50"
       >
         <Icon name="upload" size={15} strokeWidth={1.9} />
@@ -269,7 +269,7 @@ export default function CateringPanel() {
 
           {/* Notes / attribution */}
           <div className="mt-3 space-y-1 border-t border-line pt-2.5 text-[10px] leading-snug text-subtletext">
-            {isSample && <p className="text-muted">Sample data — upload the weekly Invoice Report PDF to replace.</p>}
+            {isSample && <p className="text-muted">Sample data — save the CaterTrax report page as HTML and upload it to replace.</p>}
             {!isSample && view?.warning && (
               <>
                 <p className="text-highlight">{view.warning}</p>
@@ -285,8 +285,8 @@ export default function CateringPanel() {
             )}
             {stale && <p className="text-muted">Data may be stale — last upload over two weeks ago.</p>}
             {err && <p className="text-highlight">Upload failed: {err}</p>}
-            {uploading && <p className="text-muted">Parsing PDF…</p>}
-            <p>CaterTrax · Invoice Report</p>
+            {uploading && <p className="text-muted">Parsing report…</p>}
+            <p>CaterTrax · Invoice Report (save the report page as HTML, then upload)</p>
           </div>
         </>
       )}

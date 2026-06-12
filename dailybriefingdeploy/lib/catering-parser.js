@@ -28,6 +28,7 @@
 //     days:[{ dateISO, dayLabel, dateLabel, events:[…], revenue, guests }] }
 
 import { getDocumentProxy, extractText as unpdfExtractText } from 'unpdf';
+import { load as cheerioLoad } from 'cheerio';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -387,12 +388,7 @@ export async function parseCatering(input, filename = 'invoices.pdf') {
     return buildResult(filename, '', [], `No selectable text in the PDF: ${why}.`, diag);
   }
 
-  const chunks = splitInvoices(text);
-  const events = chunks
-    .map((c) => parseInvoice(c.fieldText, c.title))
-    // Keep only chunks that produced a usable event (a date or a balance).
-    .filter((e) => e.dateISO || e.balanceDue > 0 || e.invoiceNumber);
-
+  const events = eventsFromText(text);
   if (!events.length) {
     return buildResult(
       filename,
@@ -403,6 +399,69 @@ export async function parseCatering(input, filename = 'invoices.pdf') {
     );
   }
 
+  return buildResult(filename, text, events);
+}
+
+// Split newline-structured text into invoices and parse each. Shared by the PDF
+// and HTML entry points — the only thing that differs upstream is how we obtain
+// the text. Keeps only chunks that produced a usable event (date/balance/#).
+function eventsFromText(text) {
+  return splitInvoices(text)
+    .map((c) => parseInvoice(c.fieldText, c.title))
+    .filter((e) => e.dateISO || e.balanceDue > 0 || e.invoiceNumber);
+}
+
+// ---------------------------------------------------------------------------
+// HTML entry point — for the saved CaterTrax report web page
+// ---------------------------------------------------------------------------
+
+// CaterTrax's print-to-PDF rasterizes the page (no text layer), but the report
+// *web page* has real text. Saving it as "Webpage, HTML Only" and uploading
+// that lets us recover the data. We flatten the HTML to the same newline-
+// structured text the PDF path produces, then reuse the exact same splitter and
+// field parsers — so the invoice structure only has to be understood once.
+//
+// We don't depend on CaterTrax's specific tag structure: block-level elements
+// and <br>/table rows become line breaks, everything else is stripped to text.
+// That yields "Label: value" lines the existing parser already handles.
+function htmlToText(html) {
+  let s = String(html);
+  // Drop non-content so it can't leak into the text.
+  s = s.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ');
+  s = s.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ');
+  s = s.replace(/<!--[\s\S]*?-->/g, ' ');
+  // Line breaks at visual block boundaries so labels/values land on their own
+  // lines (mirrors how the page renders).
+  s = s.replace(/<br\s*\/?>/gi, '\n');
+  s = s.replace(/<\/(p|div|li|tr|h[1-6]|table|thead|tbody|section|header|footer)>/gi, '\n');
+  s = s.replace(/<\/(td|th)>/gi, ' \n');
+  // cheerio strips the remaining tags and decodes entities (&amp; &nbsp; …).
+  const $ = cheerioLoad(`<root>${s}</root>`);
+  const raw = $('root').text();
+  // Normalize: trim each line, collapse runs of blank lines.
+  return raw
+    .split(/\r?\n/)
+    .map((l) => l.replace(/ /g, ' ').replace(/[ \t]+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
+export function parseCateringHtml(input, filename = 'invoices.html') {
+  const html = Buffer.isBuffer(input) ? input.toString('utf8') : String(input);
+  const text = htmlToText(html);
+  if (!text.trim()) {
+    return buildResult(filename, '', [], 'No text found in the saved page — is this the CaterTrax report page saved as HTML?');
+  }
+  const events = eventsFromText(text);
+  if (!events.length) {
+    return buildResult(
+      filename,
+      text,
+      [],
+      'Read the saved page but found no recognizable invoices — the report layout may differ from what the parser expects.',
+      {}
+    );
+  }
   return buildResult(filename, text, events);
 }
 
