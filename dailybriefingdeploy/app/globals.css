@@ -60,6 +60,16 @@ h1 {
   letter-spacing: -0.01em;
 }
 
+/* Desktop (xl): the three panes are a static side-by-side row. The mobile
+   carousel positions the track with an inline transform; force it off here so a
+   stale transform (e.g. after crossing the breakpoint) can never shift the row.
+   Inline styles normally beat the stylesheet, hence !important. */
+@media (min-width: 1280px) {
+  .frame-track {
+    transform: none !important;
+  }
+}
+
 /* Respect users who prefer reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   * {

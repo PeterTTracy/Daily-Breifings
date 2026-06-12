@@ -149,11 +149,13 @@ function ManualActionItem({ item, onToggle, onDismiss }) {
   const suppressTap = useRef(false); // a swipe must not also fire the tap-to-toggle
 
   const onTouchStart = (e) => {
+    e.stopPropagation(); // don't let a row swipe also drive the mobile pane carousel
     startX.current = e.touches[0].clientX;
     setDragging(true);
   };
   const onTouchMove = (e) => {
     if (!dragging) return;
+    e.stopPropagation();
     const d = Math.min(0, e.touches[0].clientX - startX.current); // dismiss is left-only
     if (Math.abs(d) > 5) suppressTap.current = true;
     setDx(d);
@@ -314,11 +316,13 @@ function SwipeableFyi({ item, onDismiss, onPromote }) {
   const startX = useRef(0);
 
   const onTouchStart = (e) => {
+    e.stopPropagation(); // don't let a row swipe also drive the mobile pane carousel
     startX.current = e.touches[0].clientX;
     setDragging(true);
   };
   const onTouchMove = (e) => {
     if (!dragging) return;
+    e.stopPropagation();
     setDx(e.touches[0].clientX - startX.current);
   };
   const onTouchEnd = () => {
@@ -819,34 +823,167 @@ function BriefingColumn() {
   );
 }
 
-// Three-pane dashboard wrapper.
-//   xl+   : left (260) · center briefing (680) · right (260), side by side.
-//   < xl  : briefing on top; the side panes stack below it (two columns on md,
-//           one on mobile), each collapsible via SidePanel.
-// DOM order is center-first so the briefing leads on narrow screens; on xl the
-// `order-*` utilities re-sequence the flex items into left/center/right.
-export default function Dashboard() {
+// xl is the desktop breakpoint (1280px) — at/above it the three panes sit side
+// by side; below it they become a swipeable carousel.
+const DESKTOP_MQ = '(min-width: 1280px)';
+
+// Mobile carousel frames, in left→right reading order for the tab strip. `i` is
+// the panel's position in the swipe track (see Dashboard): the track is laid out
+// [Catering(0), Briefing(1), Financials(2)] so that a finger-following swipe
+// LEFT lands on Financials (the desktop left pane) and a swipe RIGHT lands on
+// Catering (the desktop right pane) — the mapping Pete asked for.
+const FRAMES = [
+  { i: 2, label: 'Financials' },
+  { i: 1, label: 'Briefing' },
+  { i: 0, label: 'Catering' },
+];
+const CENTER = 1; // Briefing is the default frame on mobile.
+
+function useIsDesktop() {
+  // Lazily read the media query so the very first client render is correct (no
+  // flash), while still defaulting to mobile during SSR where there's no window.
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(DESKTOP_MQ).matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(DESKTOP_MQ);
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return isDesktop;
+}
+
+// Mobile-only segmented control: shows the active frame and lets the user jump
+// without swiping (also the accessible, discoverable affordance).
+function FrameTabs({ index, onSelect }) {
   return (
-    <div className="xl:flex xl:items-start xl:gap-5">
-      {/* Center — the briefing, kept at its 680px reading width and centered. */}
-      <div className="order-1 min-w-0 xl:order-2 xl:flex-1">
-        <div className="mx-auto w-full max-w-content">
-          <BriefingColumn />
+    <div
+      role="tablist"
+      aria-label="Dashboard panels"
+      className="mb-4 flex items-center gap-1 rounded-xl border border-line bg-surface p-1 xl:hidden"
+    >
+      {FRAMES.map((f) => {
+        const active = index === f.i;
+        return (
+          <button
+            key={f.i}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onSelect(f.i)}
+            className={`flex-1 rounded-lg px-2 py-1.5 text-[12px] font-medium transition-colors ${
+              active ? 'bg-accent text-white' : 'text-muted hover:text-ink'
+            }`}
+          >
+            {f.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Three-pane dashboard.
+//   xl+  : left (260) · center briefing (680) · right (260), side by side.
+//   < xl : a horizontal carousel of three full-width frames. Center (Briefing)
+//          is the default; swipe left for the left pane (Financials/TechCash),
+//          right for the right pane (Catering). The track DOM order is
+//          [Catering, Briefing, Financials] so a natural finger-following drag
+//          maps to that gesture; `order-*` utilities re-sequence the flex items
+//          back into left/center/right on desktop.
+export default function Dashboard() {
+  const isDesktop = useIsDesktop();
+  const [mounted, setMounted] = useState(false);
+  const [index, setIndex] = useState(CENTER); // active frame, 0..2
+  const [dx, setDx] = useState(0); // live horizontal drag offset (px)
+  const [dragging, setDragging] = useState(false);
+  const touch = useRef(null); // { x, y, axis: null | 'x' | 'y' }
+
+  useEffect(() => setMounted(true), []);
+
+  const onTouchStart = (e) => {
+    if (isDesktop) return;
+    const t = e.touches[0];
+    touch.current = { x: t.clientX, y: t.clientY, axis: null };
+    setDragging(true);
+  };
+  const onTouchMove = (e) => {
+    if (isDesktop || !touch.current) return;
+    const t = e.touches[0];
+    const moveX = t.clientX - touch.current.x;
+    const moveY = t.clientY - touch.current.y;
+    // Lock to an axis on the first decisive movement so a vertical scroll (or
+    // pull-to-refresh) never gets hijacked into a pane swipe, and vice versa.
+    if (touch.current.axis === null && (Math.abs(moveX) > 8 || Math.abs(moveY) > 8)) {
+      touch.current.axis = Math.abs(moveX) > Math.abs(moveY) ? 'x' : 'y';
+    }
+    if (touch.current.axis !== 'x') return;
+    // Resist dragging past the first / last frame so the ends feel like walls.
+    let d = moveX;
+    if ((index === 0 && d > 0) || (index === FRAMES.length - 1 && d < 0)) d *= 0.3;
+    setDx(d);
+  };
+  const onTouchEnd = () => {
+    if (isDesktop || !touch.current) return;
+    const axis = touch.current.axis;
+    touch.current = null;
+    setDragging(false);
+    if (axis === 'x') {
+      if (dx <= -SWIPE_THRESHOLD) setIndex((i) => Math.min(FRAMES.length - 1, i + 1));
+      else if (dx >= SWIPE_THRESHOLD) setIndex((i) => Math.max(0, i - 1));
+    }
+    setDx(0);
+  };
+
+  // The transform only drives the mobile carousel; on desktop the `order-*` /
+  // width utilities own the layout, so leave the track untouched there. It's
+  // also left off until mount so SSR and the first client render agree (the
+  // `-translate-x-full` class shows the center frame in the meantime).
+  const trackStyle =
+    mounted && !isDesktop
+      ? {
+          transform: `translateX(calc(${index * -100}% + ${dx}px))`,
+          transition: dragging ? 'none' : 'transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1)',
+          touchAction: 'pan-y',
+        }
+      : undefined;
+
+  return (
+    <>
+      <FrameTabs index={index} onSelect={setIndex} />
+
+      {/* Mobile clips the off-screen frames; desktop lets the three panes flow. */}
+      <div className="overflow-hidden xl:overflow-visible">
+        <div
+          className="frame-track flex -translate-x-full xl:translate-x-0 xl:items-start xl:gap-5"
+          style={trackStyle}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          {/* Frame 0 — right pane (Catering); desktop far right. */}
+          <div className="w-full shrink-0 xl:order-3 xl:w-[260px]">
+            <CateringPanel />
+          </div>
+
+          {/* Frame 1 — center briefing; desktop middle, at its 680px width. */}
+          <div className="w-full shrink-0 xl:order-2 xl:w-auto xl:flex-1">
+            <div className="mx-auto w-full max-w-content">
+              <BriefingColumn />
+            </div>
+          </div>
+
+          {/* Frame 2 — left pane (Financials + TechCash); desktop far left. */}
+          <div className="w-full shrink-0 xl:order-1 xl:w-[260px]">
+            <div className="space-y-4">
+              <FinancialsPanel />
+              <MealClicksPanel />
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Side panes. `xl:contents` dissolves this wrapper into the flex row on
-          wide screens so left/right become direct flex items; below xl it's a
-          1-col (mobile) / 2-col (md) grid sitting under the briefing. */}
-      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:mt-0 xl:contents">
-        <aside className="space-y-4 xl:order-1 xl:w-[260px] xl:shrink-0">
-          <FinancialsPanel />
-          <MealClicksPanel />
-        </aside>
-        <aside className="xl:order-3 xl:w-[260px] xl:shrink-0">
-          <CateringPanel />
-        </aside>
-      </div>
-    </div>
+    </>
   );
 }
