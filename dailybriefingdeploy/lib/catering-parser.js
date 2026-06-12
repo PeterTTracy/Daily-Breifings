@@ -27,7 +27,7 @@
 //               deliveryTime, customerName, department, balanceDue, special }],
 //     days:[{ dateISO, dayLabel, dateLabel, events:[…], revenue, guests }] }
 
-import { getDocumentProxy } from 'unpdf';
+import { getDocumentProxy, extractText as unpdfExtractText } from 'unpdf';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -251,10 +251,16 @@ function deriveRange(fullText, events) {
 // unpdf's own extractText() joins items with spaces and loses line structure,
 // which the invoice splitter depends on — so we walk the text items ourselves
 // and insert a line break whenever an item flags hasEOL or its baseline y jumps.
+//
+// Returns the text plus diagnostics (page count, number of text fragments seen)
+// so an export that yields no usable text can be told apart from a layout the
+// parser simply doesn't recognize: 0 fragments ⇒ image/scanned or a font with
+// no Unicode mapping; many fragments but no invoices ⇒ a layout difference.
 async function extractText(buffer) {
   const doc = await getDocumentProxy(new Uint8Array(buffer));
   const lines = [];
   let totalPages = 0;
+  let fragments = 0;
   try {
     totalPages = doc.numPages;
     for (let p = 1; p <= totalPages; p++) {
@@ -264,6 +270,7 @@ async function extractText(buffer) {
       let lastY = null;
       for (const it of content.items) {
         if (typeof it?.str !== 'string') continue;
+        if (it.str !== '') fragments++;
         const y = Array.isArray(it.transform) ? it.transform[5] : null;
         if (lastY !== null && y !== null && Math.abs(y - lastY) > 2) {
           lines.push(line);
@@ -285,11 +292,28 @@ async function extractText(buffer) {
     // Free pdfjs internals; ignore if the build doesn't expose destroy().
     try { await doc.destroy?.(); } catch {}
   }
-  return { text: lines.join('\n'), totalPages };
+
+  let text = lines.join('\n');
+
+  // Fallback: if our line reconstruction came up empty, try unpdf's own
+  // extractor (space-joined). If it sees text our walk missed, use it — the
+  // flat text still parses, just without title-above-marker precision.
+  if (!text.trim()) {
+    try {
+      const alt = await unpdfExtractText(await getDocumentProxy(new Uint8Array(buffer)), { mergePages: true });
+      if (alt?.text && alt.text.trim()) text = alt.text;
+    } catch {
+      // ignore — diagnostics below will report the empty extraction
+    }
+  }
+
+  return { text, totalPages, fragments };
 }
 
 // Assemble the final result object from a (possibly empty) list of events.
-function buildResult(filename, fullText, totalPages, events, warning) {
+// `diag` ({ totalPages, fragments }) is attached only on the warning paths so a
+// non-parsing upload is diagnosable from the UI.
+function buildResult(filename, fullText, events, warning, diag = {}) {
   const { startDate, endDate } = deriveRange(fullText, events);
 
   // Group by day, chronologically.
@@ -330,9 +354,11 @@ function buildResult(filename, fullText, totalPages, events, warning) {
   };
   if (warning) {
     result.warning = warning;
-    // A short text sample makes a non-parsing export diagnosable from the UI.
+    // A short text sample + counts make a non-parsing export diagnosable from
+    // the UI without needing the file itself.
     result.sampleText = collapse(fullText).slice(0, 600);
-    result.totalPages = totalPages;
+    result.totalPages = diag.totalPages ?? 0;
+    result.fragments = diag.fragments ?? 0;
   }
   return result;
 }
@@ -342,22 +368,23 @@ export async function parseCatering(input, filename = 'invoices.pdf') {
 
   let text = '';
   let totalPages = 0;
+  let fragments = 0;
   try {
-    ({ text, totalPages } = await extractText(buffer));
+    ({ text, totalPages, fragments } = await extractText(buffer));
   } catch (e) {
     // Extraction itself failed (corrupt/encrypted/non-PDF). Surface a clear,
     // valid result rather than letting the route 500 with an opaque message.
-    return buildResult(filename, '', 0, [], `Could not read the PDF: ${e.message || 'unknown error'}`);
+    return buildResult(filename, '', [], `Could not read the PDF: ${e.message || 'unknown error'}`);
   }
 
+  const diag = { totalPages, fragments };
+
   if (!text.trim()) {
-    return buildResult(
-      filename,
-      '',
-      totalPages,
-      [],
-      'No selectable text in the PDF — it may be scanned/flattened images rather than a text export.'
-    );
+    const why =
+      fragments === 0
+        ? `no text fragments across ${totalPages} page(s) — the export is likely scanned/flattened images, or uses a font with no Unicode mapping`
+        : `${fragments} text fragment(s) found across ${totalPages} page(s) but none yielded readable characters`;
+    return buildResult(filename, '', [], `No selectable text in the PDF: ${why}.`, diag);
   }
 
   const chunks = splitInvoices(text);
@@ -370,12 +397,12 @@ export async function parseCatering(input, filename = 'invoices.pdf') {
     return buildResult(
       filename,
       text,
-      totalPages,
       [],
-      'Read the PDF but found no recognizable invoices. The export layout may differ from what the parser expects.'
+      `Read ${totalPages} page(s) but found no recognizable invoices — the export layout may differ from what the parser expects.`,
+      diag
     );
   }
 
-  return buildResult(filename, text, totalPages, events);
+  return buildResult(filename, text, events);
 }
 
