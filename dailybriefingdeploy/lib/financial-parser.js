@@ -43,9 +43,24 @@ const normKey = (s) => collapse(s).toLowerCase();
 // ---------------------------------------------------------------------------
 
 function decodeQuotedPrintable(str) {
-  return str
-    .replace(/=\r?\n/g, '') // soft line breaks
-    .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+  const s = str.replace(/=\r?\n/g, ''); // soft line breaks
+  // Decode to BYTES first, then UTF-8 — decoding =E2=80=99 char-by-char would
+  // mojibake multibyte sequences (â€™ instead of ').
+  const bytes = new Uint8Array(s.length);
+  let n = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '=' && /^[0-9A-Fa-f]{2}/.test(s.slice(i + 1, i + 3))) {
+      bytes[n++] = parseInt(s.slice(i + 1, i + 3), 16);
+      i += 2;
+    } else {
+      bytes[n++] = s.charCodeAt(i) & 0xff;
+    }
+  }
+  try {
+    return new TextDecoder('utf-8').decode(bytes.subarray(0, n));
+  } catch {
+    return s;
+  }
 }
 
 function decodeBase64(str) {

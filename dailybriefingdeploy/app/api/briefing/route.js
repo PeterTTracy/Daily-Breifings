@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { safeEqual } from '../../../lib/site-auth';
 
 const STORE_KEY = 'briefing_current';
 
@@ -29,11 +30,22 @@ export async function GET() {
 
 export async function POST(req) {
   try {
-    const body = await req.json();
-
-    const apiKey = req.headers.get('x-api-key');
-    if (apiKey !== process.env.BRIEFING_API_KEY) {
+    // Auth first (and timing-safe) — don't parse bodies for unauthenticated
+    // callers, and never accept the key when it isn't configured.
+    const configuredKey = process.env.BRIEFING_API_KEY || '';
+    const apiKey = req.headers.get('x-api-key') || '';
+    if (!configuredKey || !safeEqual(apiKey, configuredKey)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => null);
+    // Minimal shape check so a malformed post can't blank the dashboard: the
+    // briefing must be an object and items (when present) must be an array.
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Body must be a JSON briefing object' }, { status: 400 });
+    }
+    if (body.items != null && !Array.isArray(body.items)) {
+      return NextResponse.json({ error: '"items" must be an array' }, { status: 400 });
     }
 
     const store = await getStore();

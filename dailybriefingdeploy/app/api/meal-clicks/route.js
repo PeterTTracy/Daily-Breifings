@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { parseMealClicks } from '../../../lib/meal-clicks-parser';
+import { isAuthorizedUpload, readUpload } from '../../../lib/api-auth';
 
 // xlsx parsing needs the Node runtime (Buffer/typed arrays), and the upload is
 // request-driven, so never statically optimize this route.
@@ -40,17 +41,20 @@ export async function GET() {
 // can show a week-over-week change.
 export async function POST(req) {
   try {
-    const form = await req.formData();
-    const file = form.get('file');
-    if (!file || typeof file.arrayBuffer !== 'function') {
+    if (!(await isAuthorizedUpload(req))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const upload = await readUpload(req, 'MPClicksByLocandDay.XLSX');
+    if (!upload) {
       return NextResponse.json(
-        { error: 'No file uploaded. Send the XLSX as multipart form field "file".' },
+        { error: 'No file uploaded. Send the XLSX as multipart form field "file", or as the raw request body with an x-filename header.' },
         { status: 400 }
       );
     }
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const parsed = parseMealClicks(bytes, file.name || 'MPClicksByLocandDay.XLSX');
+    const bytes = new Uint8Array(upload.buf);
+    const parsed = parseMealClicks(bytes, upload.name);
     const uploadedAt = Date.now();
     parsed.uploadedAt = uploadedAt;
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { parseFinancials } from '../../../lib/financial-parser';
+import { isAuthorizedUpload, readUpload } from '../../../lib/api-auth';
 
 // cheerio + MIME decoding need the Node runtime, and the upload is request-
 // driven, so never statically optimize this route.
@@ -40,17 +41,19 @@ export async function GET() {
 // so the dashboard can show week-over-week movement.
 export async function POST(req) {
   try {
-    const form = await req.formData();
-    const file = form.get('file');
-    if (!file || typeof file.arrayBuffer !== 'function') {
+    if (!(await isAuthorizedUpload(req))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const upload = await readUpload(req, 'kpis.eml');
+    if (!upload) {
       return NextResponse.json(
-        { error: 'No file uploaded. Send the .eml as multipart form field "file".' },
+        { error: 'No file uploaded. Send the .eml as multipart form field "file", or as the raw request body with an x-filename header.' },
         { status: 400 }
       );
     }
 
-    const buf = Buffer.from(await file.arrayBuffer());
-    const parsed = parseFinancials(buf, file.name || 'kpis.eml');
+    const parsed = parseFinancials(upload.buf, upload.name);
     const uploadedAt = Date.now();
     parsed.uploadedAt = uploadedAt;
 
