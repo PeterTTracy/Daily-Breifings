@@ -13,11 +13,14 @@ export async function proxy(request) {
   // Always allowed, even without a cookie:
   //  - the login page itself
   //  - the auth endpoints (login/logout)
-  //  - POST /api/briefing — the scheduled task authenticates with x-api-key in
-  //    the route handler, NOT the cookie, so it must bypass the gate.
+  //  - POSTs from the scheduled task: /api/briefing and the data uploads
+  //    (/api/financials, /api/catering, /api/meal-clicks). These authenticate
+  //    with x-api-key (or the cookie) INSIDE the route handler, so the gate
+  //    must let the request through instead of 401ing it here.
+  const SCHEDULER_POSTS = ['/api/briefing', '/api/financials', '/api/catering', '/api/meal-clicks'];
   const isLogin = pathname === '/login';
   const isAuthApi = pathname.startsWith('/api/auth/');
-  const isSchedulerPost = pathname === '/api/briefing' && request.method === 'POST';
+  const isSchedulerPost = request.method === 'POST' && SCHEDULER_POSTS.includes(pathname);
   if (isLogin || isAuthApi || isSchedulerPost) {
     return NextResponse.next();
   }

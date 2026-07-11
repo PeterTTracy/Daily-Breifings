@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { parseCatering, parseCateringHtml } from '../../../lib/catering-parser';
+import { isAuthorizedUpload, readUpload } from '../../../lib/api-auth';
 
 // pdfjs (unpdf) + cheerio need the Node runtime, and the upload is request-
 // driven, so never statically optimize this route.
@@ -40,21 +41,24 @@ export async function GET() {
 // `previous` so the dashboard could show week-over-week movement.
 export async function POST(req) {
   try {
-    const form = await req.formData();
-    const file = form.get('file');
-    if (!file || typeof file.arrayBuffer !== 'function') {
+    if (!(await isAuthorizedUpload(req))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const upload = await readUpload(req, 'invoices');
+    if (!upload) {
       return NextResponse.json(
-        { error: 'No file uploaded. Send the PDF as multipart form field "file".' },
+        { error: 'No file uploaded. Send the report as multipart form field "file", or as the raw request body with an x-filename header.' },
         { status: 400 }
       );
     }
 
-    const buf = Buffer.from(await file.arrayBuffer());
+    const { buf } = upload;
     // Accept either the CaterTrax PDF or the saved report web page (HTML). The
     // PDF export is image-only so it won't parse, but the HTML page has real
     // text — detect by content signature, falling back to the filename.
     const head = buf.subarray(0, 1024).toString('latin1').trimStart().toLowerCase();
-    const name = file.name || 'invoices';
+    const name = upload.name;
     const isPdf = head.startsWith('%pdf') || /\.pdf$/i.test(name);
     const isHtml = head.startsWith('<!doctype') || head.startsWith('<html') || /<html|<table|<body/.test(head) || /\.(html?|mhtml)$/i.test(name);
     const parsed = isPdf && !isHtml
