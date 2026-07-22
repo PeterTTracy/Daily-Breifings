@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
+import { getLatestBriefingFromSupabase } from '../../../lib/supabase-briefing';
 
 const STORE_KEY = 'briefing_current';
+
+// The briefing changes rarely (a few times a day) but this route is hit on every
+// page load, so never let a CDN/data cache pin a stale copy — always recompute.
+export const dynamic = 'force-dynamic';
 
 async function getStore() {
   if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
@@ -13,9 +18,42 @@ async function getStore() {
   return null;
 }
 
+// Stable identity for a briefing, used to tell "same briefing, user toggled some
+// items complete" apart from "a genuinely newer briefing arrived".
+function briefingIdentity(b) {
+  if (!b) return null;
+  return b.id || [b.date, b.briefingType].filter(Boolean).join('|') || null;
+}
+
 export async function GET() {
   try {
+    // Source of truth is Supabase — that's where the scheduled routine writes the
+    // briefing it assembles (execute_sql ingest + trigger_recap). KV is the legacy
+    // store and can be days stale, so Supabase wins whenever it has a briefing.
+    const supa = await getLatestBriefingFromSupabase();
     const store = await getStore();
+
+    if (supa) {
+      if (store) {
+        // Mirror the Supabase briefing into KV so the KV-backed /api/complete
+        // toggle has something to write to, and so KV stays a warm fallback.
+        // But if KV already holds THIS SAME briefing, return the KV copy — it may
+        // carry completed-flag toggles the user made since it was mirrored. Only
+        // overwrite (dropping stale toggles) when a newer briefing has arrived.
+        try {
+          const kvData = await store.get(STORE_KEY);
+          if (kvData && briefingIdentity(kvData) === briefingIdentity(supa)) {
+            return NextResponse.json(kvData);
+          }
+          await store.set(STORE_KEY, supa);
+        } catch (e) {
+          // KV mirror is best-effort; never fail the read because of it.
+        }
+      }
+      return NextResponse.json(supa);
+    }
+
+    // No Supabase briefing (unconfigured, RLS, or empty) — fall back to KV.
     if (store) {
       const data = await store.get(STORE_KEY);
       if (data) return NextResponse.json(data);
