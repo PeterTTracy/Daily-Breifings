@@ -17,6 +17,43 @@ share this app now lives in `../ops-platform` with its own deployment.
 
 Manual items, dismissed/promoted FYIs, and the theme persist in localStorage.
 
+## Posting a briefing (the scheduled pipeline)
+
+The briefing is produced by a scheduled Cowork/claude.ai routine
+(`continuous-briefing-pull`): it reads Outlook email + calendar, assembles the
+briefing JSON, then **POSTs it to `/api/briefing`**. The pull and build steps are
+reliable; the **POST step is the one that has failed repeatedly** and left the
+live app stale.
+
+**Root cause of the misses:** the POST was attempted through a path that does not
+exist in a headless/cron run — a browser / Chrome-extension fetch, or a sandbox
+whose network egress differs from an interactive session. A plain server-side
+HTTPS POST reaches the endpoint fine (both GET and POST verified reachable, and
+`proxy.js` correctly bypasses the site gate for `POST /api/briefing`).
+
+**Rule: always post with a plain HTTP client, never the browser.** Use the
+helper, which retries, verifies the write landed, and exits non-zero on failure
+(the old failure mode was *silent* — the run "finished" but nothing landed):
+
+```bash
+BRIEFING_API_KEY=xxx node scripts/post-briefing.mjs briefing.json
+# or:  cat briefing.json | BRIEFING_API_KEY=xxx node scripts/post-briefing.mjs
+```
+
+Equivalent one-liner if the script isn't available in the run environment:
+
+```bash
+curl -fsS -X POST https://daily-briefings-eight.vercel.app/api/briefing \
+  -H "Content-Type: application/json" -H "x-api-key: $BRIEFING_API_KEY" \
+  --data @briefing.json
+# then GET the endpoint back and confirm the "date" field matches before calling it done.
+```
+
+Exit codes from `post-briefing.mjs`: `0` ok, `1` POST failed after retries,
+`2` bad input, `3` 401 (API-key mismatch), `4` posted but the live app didn't
+reflect it (wrong URL / KV lag). A run must treat any non-zero exit as a failed
+post and surface it — do not report the briefing as delivered.
+
 ## Environment variables
 
 | Variable | Description |
