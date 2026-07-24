@@ -20,20 +20,20 @@ async function getStore() {
 
 export async function GET() {
   try {
-    // Vercel KV is the primary source. The scheduled routine normally POSTs the
-    // assembled briefing here (see POST below / scripts/post-briefing.mjs); the
-    // KV-backed /api/complete toggle writes back to the same key.
+    // Supabase is the primary source: the scheduled task sandbox can't reach this
+    // deployment (its proxy blocks the Vercel domain), so it writes briefings
+    // straight to the `briefings` table. Read the newest row first so a stale KV
+    // copy can't shadow a fresh Supabase briefing.
+    const fromSupabase = await getBriefingFromSupabase();
+    if (fromSupabase) return NextResponse.json(fromSupabase);
+
+    // Fallback to Vercel KV, still written by direct POSTs to /api/briefing and
+    // by the KV-backed /api/complete toggle when the deployment is reachable.
     const store = await getStore();
     if (store) {
       const data = await store.get(STORE_KEY);
       if (data) return NextResponse.json(data);
     }
-
-    // Fallback: the scheduled task sandbox can't reach this deployment (its proxy
-    // blocks the Vercel domain), so it writes briefings straight to Supabase. When
-    // KV is empty, read the most recent row from the `briefings` table instead.
-    const fromSupabase = await getBriefingFromSupabase();
-    if (fromSupabase) return NextResponse.json(fromSupabase);
 
     return NextResponse.json(getSampleBriefing());
   } catch (e) {
