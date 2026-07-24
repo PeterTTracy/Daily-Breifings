@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Icon from './components/Icon';
 import FinancialsPanel from './components/FinancialsPanel';
+import ScorecardPanel from './components/ScorecardPanel';
 import MealClicksPanel from './components/MealClicksPanel';
 import CateringPanel from './components/CateringPanel';
 
@@ -967,6 +968,7 @@ export default function Dashboard() {
           <div className="w-full shrink-0 xl:w-[260px]">
             <div className="space-y-4">
               <FinancialsPanel />
+              <ScorecardPanel />
               <MealClicksPanel />
             </div>
           </div>
