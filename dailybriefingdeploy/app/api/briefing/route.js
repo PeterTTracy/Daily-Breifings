@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getSupabase, isSupabaseConfigured } from '../../../lib/supabase';
 
 const STORE_KEY = 'briefing_current';
 
@@ -19,7 +20,7 @@ async function getStore() {
 
 export async function GET() {
   try {
-    // Vercel KV is the single source of truth. The scheduled routine POSTs the
+    // Vercel KV is the primary source. The scheduled routine normally POSTs the
     // assembled briefing here (see POST below / scripts/post-briefing.mjs); the
     // KV-backed /api/complete toggle writes back to the same key.
     const store = await getStore();
@@ -28,9 +29,45 @@ export async function GET() {
       if (data) return NextResponse.json(data);
     }
 
+    // Fallback: the scheduled task sandbox can't reach this deployment (its proxy
+    // blocks the Vercel domain), so it writes briefings straight to Supabase. When
+    // KV is empty, read the most recent row from the `briefings` table instead.
+    const fromSupabase = await getBriefingFromSupabase();
+    if (fromSupabase) return NextResponse.json(fromSupabase);
+
     return NextResponse.json(getSampleBriefing());
   } catch (e) {
     return NextResponse.json(getSampleBriefing());
+  }
+}
+
+// Read the newest briefing row from Supabase and reshape it to the JSON the
+// frontend expects (the same shape KV stores). Returns null when Supabase isn't
+// configured, has no rows, or errors — callers then fall through to sample data.
+async function getBriefingFromSupabase() {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('briefings')
+      .select('date, briefing_type, items, calendar, alerts, prep_notes, tomorrow_preview, created_at')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return {
+      date: data.date ?? null,
+      briefingType: data.briefing_type ?? null,
+      alerts: data.alerts ?? [],
+      items: data.items ?? [],
+      calendar: data.calendar ?? [],
+      prepNotes: data.prep_notes ?? '',
+      tomorrowPreview: data.tomorrow_preview ?? '',
+    };
+  } catch (e) {
+    return null;
   }
 }
 
