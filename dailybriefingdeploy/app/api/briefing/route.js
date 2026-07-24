@@ -48,24 +48,19 @@ async function getBriefingFromSupabase() {
   if (!isSupabaseConfigured()) return null;
   try {
     const supabase = getSupabase();
+    // The full briefing JSON lives in the `payload` column, already in the exact
+    // shape the frontend expects (date, briefingType, items, calendar, alerts,
+    // prepNotes, tomorrowPreview) — so return it verbatim, newest row first.
     const { data, error } = await supabase
       .from('briefings')
-      .select('date, briefing_type, items, calendar, alerts, prep_notes, tomorrow_preview, created_at')
-      .order('created_at', { ascending: false })
+      .select('payload')
+      .order('generated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (error || !data) return null;
+    if (error || !data || !data.payload) return null;
 
-    return {
-      date: data.date ?? null,
-      briefingType: data.briefing_type ?? null,
-      alerts: data.alerts ?? [],
-      items: data.items ?? [],
-      calendar: data.calendar ?? [],
-      prepNotes: data.prep_notes ?? '',
-      tomorrowPreview: data.tomorrow_preview ?? '',
-    };
+    return data.payload;
   } catch (e) {
     return null;
   }
